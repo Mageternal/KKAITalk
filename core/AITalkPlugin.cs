@@ -4,6 +4,8 @@ using KKAITalk.Context;
 using KKAITalk.LLM;
 using KKAITalk.UI;
 using KKAPI.MainGame;
+using Manager;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Collections;
