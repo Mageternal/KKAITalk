@@ -1,10 +1,11 @@
-﻿using System;
+﻿using ActionGame;
+using ExtensibleSaveFormat;
+using KKAPI.MainGame;
+using KKAPI.Utilities;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using KKAPI.MainGame;
-using KKAPI.Utilities;
-using ActionGame;
 using UnityEngine;
 
 namespace KKAITalk.Context
@@ -32,8 +33,17 @@ namespace KKAITalk.Context
             {
                 Name = heroine.Name,
                 Personality = heroine.personality.ToString(),
-                CharaId = heroine.Name + "_" + heroine.chaCtrl?.fileParam?.birthDay
+                CharaId = heroine.Name + "_" + heroine.chaCtrl?.fileParam?.birthDay,
+                ProfileText = ReadProfileText(heroine.chaCtrl?.chaFile)
             };
+        }
+        public static string ReadProfileText(ChaFile chaFile)
+        {
+            if (chaFile == null) return null;
+            var data = ExtendedSave.GetExtendedDataById(chaFile, "KK_Profile");
+            if (data == null || !data.data.ContainsKey("ProfileText"))
+                return null;
+            return data.data["ProfileText"] as string;
         }
     }
 }

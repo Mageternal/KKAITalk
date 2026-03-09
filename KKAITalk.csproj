@@ -50,6 +50,9 @@
       <HintPath>F:\Temp\game\PC game\Koikatsu BetterRepack RX21\BepInEx\core\BepInEx.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="ExtensibleSaveFormat">
+      <HintPath>F:\Temp\game\PC game\Koikatsu BetterRepack RX21\BepInEx\plugins\KK_BepisPlugins\ExtensibleSaveFormat.dll</HintPath>
+    </Reference>
     <Reference Include="KKAPI">
       <HintPath>F:\Temp\game\PC game\Koikatsu BetterRepack RX21\BepInEx\plugins\KKAPI.dll</HintPath>
       <Private>False</Private>
@@ -75,6 +78,7 @@
     <Compile Include="Context\GameContextBuilder.cs" />
     <Compile Include="core\AITalkGameController.cs" />
     <Compile Include="core\AITalkPlugin.cs" />
+    <Compile Include="core\test.cs" />
     <Compile Include="LLM\ChatModels.cs" />
     <Compile Include="LLM\LlamaClient.cs" />
     <Compile Include="Memory\MemoryManager.cs" />

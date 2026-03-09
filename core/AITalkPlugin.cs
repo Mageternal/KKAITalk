@@ -24,6 +24,10 @@ namespace KKAITalk
             DontDestroyOnLoad(uiObj);
             uiObj.AddComponent<AIDialogueUI>();
 
+            var testObj = new GameObject("TestRunner");
+            DontDestroyOnLoad(testObj);
+            testObj.AddComponent<TestRunner>();
+
             Log = Logger;
             Log.LogInfo("KKAITalk 插件已加载！");
             Client = gameObject.AddComponent<LlamaClient>();

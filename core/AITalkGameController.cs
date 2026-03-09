@@ -4,6 +4,7 @@ using KKAITalk.LLM;
 using KKAITalk.Memory;
 using KKAITalk.UI;
 using KKAPI.MainGame;
+using System.IO;
 using UnityEngine;
 
 namespace KKAITalk

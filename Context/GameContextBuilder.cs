@@ -30,13 +30,20 @@ namespace KKAITalk.Context
 
         private static string BuildSystemPrompt(CharacterContext chara)
         {
-            string personalityDesc = TranslatePersonality(chara.Personality);
             string periodDesc = TranslatePeriod(chara.CurrentPeriod);
 
-            return chara.Name + "是一个" + personalityDesc + "的女生。" +
-                   "现在是" + periodDesc + "。" +
-                   "你就是" + chara.Name + "，直接用第一人称回答，" +
-                   "不超过80字，不得提及自己是AI。";
+            var sb = new System.Text.StringBuilder();
+            sb.AppendFormat("你是{0}。", chara.Name);
+
+            if (!string.IsNullOrEmpty(chara.ProfileText))
+                sb.AppendFormat("{0} ", chara.ProfileText);
+            else
+                sb.AppendFormat("你是一个{0}的女生。", TranslatePersonality(chara.Personality));
+
+            sb.AppendFormat("现在是{0}。", periodDesc);
+            sb.Append("直接用第一人称回答，不超过80字，不得提及自己是AI。");
+
+            return sb.ToString();
         }
 
         private static string TranslatePersonality(string personality)
