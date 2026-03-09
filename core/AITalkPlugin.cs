@@ -4,11 +4,10 @@ using KKAITalk.Context;
 using KKAITalk.LLM;
 using KKAITalk.UI;
 using KKAPI.MainGame;
-using Manager;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using System.Collections;
+
 
 namespace KKAITalk
 {
@@ -59,6 +58,19 @@ namespace KKAITalk
             yield return null;
             var talkScene = FindObjectOfType<TalkScene>();
             if (talkScene == null) yield break;
+
+
+            var saveData = Manager.Game.Instance?.saveData;
+            string accName = saveData?.accademyName ?? "default";
+            string savePath = SaveData.Path ?? "";
+            string saveFileName = System.IO.Path.GetFileNameWithoutExtension(savePath);
+
+            // 最终存档文件夹名：学校名_存档文件名
+            string saveId = string.IsNullOrEmpty(saveFileName)
+                ? accName
+                : accName + "_" + saveFileName;
+
+            AITalkPlugin.Log.LogInfo("存档ID: " + saveId);
 
             // 轮询等待MsgWindowCanvas激活
             GameObject msgWindowCanvas = null;

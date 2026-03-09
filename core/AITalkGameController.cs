@@ -1,6 +1,7 @@
 ﻿using ActionGame;
 using KKAITalk.Context;
 using KKAITalk.LLM;
+using KKAITalk.Memory;
 using KKAITalk.UI;
 using KKAPI.MainGame;
 using UnityEngine;
@@ -28,10 +29,23 @@ namespace KKAITalk
 
             AIDialogueUI.Instance?.ShowWaiting(_currentChara.Name);
 
-            var messages = GameContextBuilder.BuildMessages(_currentChara, playerInput);
+            // 读取记忆
+            string saveId = MemoryManager.GetSaveId();
+            var history = MemoryManager.LoadHistory(saveId, _currentChara.CharaId);
+
+            var messages = GameContextBuilder.BuildMessages(_currentChara, playerInput, history);
             AITalkPlugin.Client.SendMessage(
                 messages,
-                reply => AIDialogueUI.Instance?.ShowReply(reply),
+                reply =>
+                {
+                    AIDialogueUI.Instance?.ShowReply(reply);
+                    AITalkPlugin.Log.LogInfo("[" + _currentChara.Name + "] " + reply);
+
+                    // 保存这轮对话到历史
+                    history.Add(new ChatMessage { role = "user", content = playerInput });
+                    history.Add(new ChatMessage { role = "assistant", content = reply });
+                    MemoryManager.SaveHistory(saveId, _currentChara.CharaId, history);
+                },
                 err => AITalkPlugin.Log.LogError("请求失败: " + err),
                 ThinkingMode.Normal
             );

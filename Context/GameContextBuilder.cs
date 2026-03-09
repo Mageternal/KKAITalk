@@ -11,14 +11,21 @@ namespace KKAITalk.Context
 {
     public static class GameContextBuilder
     {
-        public static List<ChatMessage> BuildMessages(CharacterContext chara, string userInput)
+        public static List<ChatMessage> BuildMessages(CharacterContext chara, string userInput, List<ChatMessage> history = null)
         {
             string systemPrompt = BuildSystemPrompt(chara);
-            return new List<ChatMessage>
+            var messages = new List<ChatMessage>
             {
-                new ChatMessage { role = "system", content = systemPrompt },
-                new ChatMessage { role = "user",   content = userInput }
+                new ChatMessage { role = "system", content = systemPrompt }
             };
+
+            // 插入历史记录
+            if (history != null && history.Count > 0)
+                messages.AddRange(history);
+
+            // 加入本次用户输入
+            messages.Add(new ChatMessage { role = "user", content = userInput });
+            return messages;
         }
 
         private static string BuildSystemPrompt(CharacterContext chara)
