@@ -5,19 +5,37 @@ using System.Linq;
 using System.Text;
 
 
+
 namespace KKAITalk.Context
 {
     public class CharacterContext
     {
-        public string Name;           // 角色名字
-        public string Personality;    // 性格类型
-        public string CharaId;        // 唯一ID，用于区分不同角色的记忆存档
-        public Cycle.Type CurrentPeriod;  // 新增时间段
+        public string Name;
+        public string Personality;
+        public string CharaId;
+        public Cycle.Type CurrentPeriod;
         public string ProfileText;
 
-        public override string ToString()
-        {
-            return $"Name={Name}, Personality={Personality}, ID={CharaId}";
-        }
+        // 关系状态
+        public int Favor;
+        public bool IsGirlfriend;
+        public bool IsStaff;
+        public bool IsDate;
+        public bool IsAnger;
+        public int Anger;
+        public bool Confessed;
+        public bool IsFirstGirlfriend;
+
+        // 亲密度
+        public int Intimacy;
+        public bool IsLunch;
+        public int MyRoomCount;
+
+        // 经历
+        public int Lewdness;
+        public bool IsVirgin;
+        public bool IsAnalVirgin;
+        public bool IsKiss;
+
     }
 }

@@ -3,6 +3,8 @@ using KKAPI.Maker;
 using System;
 using System.Linq;
 using UnityEngine;
+using static SaveData;
+using static Studio.Info.LightLoadInfo;
 
 namespace KKAITalk
 {
@@ -11,35 +13,40 @@ namespace KKAITalk
         private void Update()
         {
             if (Input.GetKeyDown(KeyCode.F8))
+                RunTest();
+
+            if (Input.GetKeyDown(KeyCode.F9))
+                DumpHeroineStatus();
+        }
+
+        private void DumpHeroineStatus()
+        {
+            AITalkPlugin.Log.LogInfo("=== Heroine Status ===");
+            
+
+            var saveData = Manager.Game.Instance?.saveData;
+            if (saveData == null)
             {
-                string cardPath = "F:\\Temp\\game\\PC game\\Koikatsu BetterRepack RX21\\UserData\\chara\\female\\Koikatu_F_20260314190351791_高垣 枫_Mageternal.png";
-
-                if (!System.IO.File.Exists(cardPath))
-                {
-                    AITalkPlugin.Log.LogWarning("文件不存在: " + cardPath);
-                    return;
-                }
-
-                var chaFileCtrl = new ChaFileControl();
-                chaFileCtrl.LoadCharaFile(cardPath, 1, false, true);
-
-                AITalkPlugin.Log.LogInfo($"从文件加载: {chaFileCtrl.parameter.fullname}");
-
-                var allData = ExtendedSave.GetAllExtendedData(chaFileCtrl);
-                if (allData == null || allData.Count == 0)
-                {
-                    AITalkPlugin.Log.LogWarning("文件里也没有扩展数据");
-                    return;
-                }
-
-                foreach (var kv in allData)
-                {
-                    AITalkPlugin.Log.LogInfo($"  GUID: {kv.Key}");
-                    if (kv.Value?.data == null) continue;
-                    foreach (var field in kv.Value.data)
-                        AITalkPlugin.Log.LogInfo($"    key={field.Key}, value={field.Value}");
-                }
+                AITalkPlugin.Log.LogWarning("saveData为null");
+                return;
             }
+
+            var heroines = saveData.heroineList;
+            if (heroines == null || heroines.Count == 0)
+            {
+                AITalkPlugin.Log.LogWarning("没有找到heroine");
+                return;
+            }
+
+            var testHeroine = saveData.heroineList[0];
+
+            // 新增favor测试
+            AITalkPlugin.Log.LogInfo($"当前favor: {testHeroine.favor}");
+            testHeroine.favor = testHeroine.favor + 10;
+            AITalkPlugin.Log.LogInfo($"修改后favor: {testHeroine.favor}");
+
+
+            AITalkPlugin.Log.LogInfo("=== End ===");
         }
         private void Start()
         {

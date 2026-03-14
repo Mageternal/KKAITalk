@@ -34,7 +34,25 @@ namespace KKAITalk.Context
                 Name = heroine.Name,
                 Personality = heroine.personality.ToString(),
                 CharaId = heroine.Name + "_" + heroine.chaCtrl?.fileParam?.birthDay,
-                ProfileText = ReadProfileText(heroine.chaCtrl?.chaFile)
+                ProfileText = ReadProfileText(heroine.chaCtrl?.chaFile),
+
+                Favor = heroine.favor,
+                IsGirlfriend = heroine.isGirlfriend,
+                IsStaff = heroine.isStaff,
+                IsDate = heroine.isDate,
+                IsAnger = heroine.isAnger,
+                Anger = heroine.anger,
+                Confessed = heroine.confessed,
+                IsFirstGirlfriend = heroine.isFirstGirlfriend,
+
+                Intimacy = heroine.intimacy,
+                IsLunch = heroine.isLunch,
+                MyRoomCount = heroine.myRoomCount,
+
+                Lewdness = heroine.lewdness,
+                IsVirgin = heroine.isVirgin,
+                IsAnalVirgin = heroine.isAnalVirgin,
+                IsKiss = heroine.isKiss,
             };
         }
         public static string ReadProfileText(ChaFile chaFile)
