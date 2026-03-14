@@ -9,11 +9,11 @@ using UnityEngine.Networking;
 
 namespace KKAITalk.LLM
 {
-    public enum ThinkingMode
-    {
-        Fast,     // 快速模式：禁用思考，适合简单对话
-        Normal    // 思考模式：启用思考，适合复杂场景
-    }
+    //public enum ThinkingMode
+    //{
+    //    Fast,     // 快速模式：禁用思考，适合简单对话
+    //    Normal    // 思考模式：启用思考，适合复杂场景
+    //}
 
     public class LlamaClient : MonoBehaviour
     {
@@ -21,17 +21,16 @@ namespace KKAITalk.LLM
         private string _model = "Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf";
 
         // 默认思考模式
-        public ThinkingMode Mode = ThinkingMode.Normal;
+        //public ThinkingMode Mode = ThinkingMode.Normal;
 
-        public void SendMessage(List<ChatMessage> messages, Action<string> onSuccess, Action<string> onError, ThinkingMode? modeOverride = null)
+        public void SendMessage(List<ChatMessage> messages, Action<string> onSuccess, Action<string> onError)
         {
-            var mode = modeOverride ?? Mode;
-            StartCoroutine(SendCoroutine(messages, onSuccess, onError, mode));
+            StartCoroutine(SendCoroutine(messages, onSuccess, onError));
         }
 
-        private IEnumerator SendCoroutine(List<ChatMessage> messages, Action<string> onSuccess, Action<string> onError, ThinkingMode mode)
+        private IEnumerator SendCoroutine(List<ChatMessage> messages, Action<string> onSuccess, Action<string> onError)
         {
-            string json = BuildJson(messages, mode);
+            string json = BuildJson(messages);
             byte[] body = new System.Text.UTF8Encoding(false).GetBytes(json);
 
             var www = new UnityWebRequest(_url, "POST");
@@ -58,15 +57,12 @@ namespace KKAITalk.LLM
             www.Dispose();
         }
 
-        private string BuildJson(List<ChatMessage> messages, ThinkingMode mode)
+        private string BuildJson(List<ChatMessage> messages)
         {
             var sb = new System.Text.StringBuilder();
             sb.Append("{");
             sb.AppendFormat("\"model\":\"{0}\",", _model);
             sb.Append("\"stream\":false,");
-            sb.Append("\"thinking\":true,");
-            if (mode == ThinkingMode.Fast)
-                sb.Append("\"max_tokens\":500,");
             sb.Append("\"messages\":[");
 
             for (int i = 0; i < messages.Count; i++)

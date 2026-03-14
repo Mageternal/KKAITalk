@@ -1,4 +1,5 @@
 ﻿using BepInEx;
+using BepInEx.Configuration;
 using BepInEx.Logging;
 using KKAITalk.Context;
 using KKAITalk.LLM;
@@ -11,12 +12,13 @@ using UnityEngine.SceneManagement;
 
 namespace KKAITalk
 {
-    [BepInPlugin("com.yourname.kkaitalik", "KKAITalk", "1.0.0")]
+    [BepInPlugin("com.Mageternal.kkaitalik", "KKAITalk", "1.0.0")]
     [BepInDependency(KKAPI.KoikatuAPI.GUID)]
     public class AITalkPlugin : BaseUnityPlugin
     {
         internal static ManualLogSource Log;
         internal static LlamaClient Client;
+        internal static ConfigEntry<bool> UseThinking;
 
         private void Awake()
         {
@@ -27,6 +29,13 @@ namespace KKAITalk
             var testObj = new GameObject("TestRunner");
             DontDestroyOnLoad(testObj);
             testObj.AddComponent<TestRunner>();
+
+            UseThinking = Config.Bind(
+                "LLM",           // 分组
+                "UseThinking",   // key
+                false,           // 默认关闭
+                "日常对话是否启用思考模式，开启后回复更准确但速度慢"
+            );
 
             Log = Logger;
             Log.LogInfo("KKAITalk 插件已加载！");
@@ -100,20 +109,20 @@ namespace KKAITalk
                 var skip = msgWindowCanvas.transform.Find(
                     "MsgWindow02/Buttons/Under_BG/Under_Right/Skip");
 
-                if (skip != null && skip.gameObject.activeInHierarchy)
-                {
-                    var pointer = new UnityEngine.EventSystems.PointerEventData(
-                        UnityEngine.EventSystems.EventSystem.current);
-                    UnityEngine.EventSystems.ExecuteEvents.Execute(
-                        skip.gameObject, pointer,
-                        UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler);
-                    AITalkPlugin.Log.LogInfo("点击Skip，等待对话自然结束");
+                //if (skip != null && skip.gameObject.activeInHierarchy)
+                //{
+                //    var pointer = new UnityEngine.EventSystems.PointerEventData(
+                //        UnityEngine.EventSystems.EventSystem.current);
+                //    UnityEngine.EventSystems.ExecuteEvents.Execute(
+                //        skip.gameObject, pointer,
+                //        UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler);
+                //    AITalkPlugin.Log.LogInfo("点击Skip，等待对话自然结束");
 
-                    // 等对话自然结束
-                    yield return new WaitForSeconds(1f);
-                }
-                else
-                    AITalkPlugin.Log.LogWarning("Skip未激活，跳过");
+                //    // 等对话自然结束
+                //    yield return new WaitForSeconds(1f);
+                //}
+                //else
+                //    AITalkPlugin.Log.LogWarning("Skip未激活，跳过");
 
                 // 不再主动SetActive(false)
             }
