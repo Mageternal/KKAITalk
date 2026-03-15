@@ -109,20 +109,20 @@ namespace KKAITalk
                 var skip = msgWindowCanvas.transform.Find(
                     "MsgWindow02/Buttons/Under_BG/Under_Right/Skip");
 
-                if (skip != null && skip.gameObject.activeInHierarchy)
-                {
-                    var pointer = new UnityEngine.EventSystems.PointerEventData(
-                        UnityEngine.EventSystems.EventSystem.current);
-                    UnityEngine.EventSystems.ExecuteEvents.Execute(
-                        skip.gameObject, pointer,
-                        UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler);
-                    AITalkPlugin.Log.LogInfo("点击Skip，等待对话自然结束");
+                //if (skip != null && skip.gameObject.activeInHierarchy)
+                //{
+                //    var pointer = new UnityEngine.EventSystems.PointerEventData(
+                //        UnityEngine.EventSystems.EventSystem.current);
+                //    UnityEngine.EventSystems.ExecuteEvents.Execute(
+                //        skip.gameObject, pointer,
+                //        UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler);
+                //    AITalkPlugin.Log.LogInfo("点击Skip，等待对话自然结束");
 
-                    // 等对话自然结束
-                    yield return new WaitForSeconds(1f);
-                }
-                else
-                    AITalkPlugin.Log.LogWarning("Skip未激活，跳过");
+                //    // 等对话自然结束
+                //    yield return new WaitForSeconds(1f);
+                //}
+                //else
+                //    AITalkPlugin.Log.LogWarning("Skip未激活，跳过");
 
                 // 不再主动SetActive(false)
             }
