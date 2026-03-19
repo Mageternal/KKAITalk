@@ -136,7 +136,7 @@ namespace KKAITalk
                 _sceneBeforeTalk = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
                 Invoke("OnTalkSceneReady", 0.1f);
             }
-
+            //吃饭场景
             if (scene.name == "DiningRoom")
             {
                 AITalkPlugin.Log.LogInfo($"DiningRoom加载, _talkSceneWasLoaded={_talkSceneWasLoaded}, _eventTriggered={_eventTriggered}, _sceneBeforeTalk={_sceneBeforeTalk}");
@@ -147,6 +147,12 @@ namespace KKAITalk
                     _pendingEventScene = "DiningRoom";
                     Invoke("OnEventSceneReady", 1f);
                 }
+            }
+            if (scene.name == "Rooftop" && _eventTriggered && _sceneBeforeTalk != "Rooftop")
+            {
+                _eventTriggered = false;
+                _pendingEventScene = "Rooftop";
+                Invoke("OnEventSceneReady", 1f);
             }
             // 学习场景
             if ((scene.name == "LibraryRoom" || scene.name == "1-1" ||
@@ -331,6 +337,12 @@ namespace KKAITalk
                     _pendingEventScene = "Exercise";
                     Invoke("OnEventSceneReady", 1f);
                 }
+                else if (_sceneBeforeTalk == "Rooftop" && _eventTriggered)
+                {
+                    _eventTriggered = false;
+                    _pendingEventScene = "Rooftop";
+                    Invoke("OnEventSceneReady", 1f);
+                }
             }
         }
 
@@ -370,14 +382,14 @@ namespace KKAITalk
 
             // 延迟后开始轮询点击Skip
             Invoke("StartSkipping", 1f);
-
+            
             string charaName = talkScene.targetHeroine?.Name ?? "";
             AIDialogueUI.Instance?.ShowInputMode(charaName);
             AITalkPlugin.Log.LogInfo("AI模式自动开启");
-
+            
             var controller = FindObjectOfType<AITalkGameController>();
             AITalkPlugin.Log.LogInfo($"controller是否为null: {controller == null}");
-
+            
             if (controller != null && talkScene.targetHeroine != null)
             {
                 var heroine = talkScene.targetHeroine;

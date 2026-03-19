@@ -1,12 +1,13 @@
 ﻿using ActionGame;
-using KKAITalk.Context;
 using KKAITalk;
+using KKAITalk.Context;
 using KKAITalk.LLM;
 using KKAITalk.Memory;
 using KKAITalk.UI;
 using KKAPI.MainGame;
 using System.IO;
 using UnityEngine;
+using static SaveData;
 
 namespace KKAITalk
 {
@@ -63,7 +64,7 @@ namespace KKAITalk
                     // 触发游戏事件 ← 放这里
                     var talkScene = UnityEngine.Object.FindObjectOfType<TalkScene>();
                     if (talkScene != null)
-                        ParseAndTriggerEvent(reply, talkScene);
+                        ParseAndTriggerEvent(reply, talkScene, heroine);
 
                     // 解析anger用原始reply
                     if (heroine.isAnger)
@@ -144,12 +145,25 @@ namespace KKAITalk
             if (maxIdx == sorryIdx) return -100;
             return 0;
         }
-        private void ParseAndTriggerEvent(string reply, TalkScene talkScene)
+        private void ParseAndTriggerEvent(string reply, TalkScene talkScene, SaveData.Heroine heroine)
         {
+            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "Talk")
+            {
+                AITalkPlugin.Log.LogInfo("非Talk场景，跳过事件触发");
+                return;
+            }
+
+            // 表白直接改布尔值，不触发按钮
+            if (reply.Contains("[EVENT:CONFESS]"))
+            {
+                heroine.isGirlfriend = true;
+                AITalkPlugin.Log.LogInfo("表白成功，isGirlfriend=true");
+                return;
+            }
 
             int index = -1;
-            if (reply.Contains("[EVENT:CONFESS]")) index = 1;
-            else if (reply.Contains("[EVENT:H]")) index = 3;
+            if (reply.Contains("[EVENT:DIVORCE]")) index = 2;
+            else if(reply.Contains("[EVENT:H]")) index = 3;
             else if (reply.Contains("[EVENT:LUNCH]")) index = 4;
             else if (reply.Contains("[EVENT:CLUB]")) index = 5;
             else if (reply.Contains("[EVENT:GOHOME]")) index = 6;
