@@ -155,6 +155,7 @@ namespace KKAITalk.Context
                     "[EVENT:JOIN]你同意加入恋爱社团；" +
                     "[EVENT:FOLLOW]你同意跟随；" +
                     "[EVENT:NONE]无明确请求或你拒绝了请求。");
+                sb.Append("另外，如果玩家明确表达了分手或结束恋人关系的意图，在回复末尾附加[EVENT:DIVORCE]，其他情况不使用此标签。");
             }
             return sb.ToString();
         }

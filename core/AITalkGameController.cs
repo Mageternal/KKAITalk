@@ -147,17 +147,22 @@ namespace KKAITalk
         }
         private void ParseAndTriggerEvent(string reply, TalkScene talkScene, SaveData.Heroine heroine)
         {
-            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "Talk")
-            {
-                AITalkPlugin.Log.LogInfo("非Talk场景，跳过事件触发");
-                return;
-            }
-
-            // 表白直接改布尔值，不触发按钮
+            // 表白直接改布尔值，不受场景限制
             if (reply.Contains("[EVENT:CONFESS]"))
             {
                 heroine.isGirlfriend = true;
                 AITalkPlugin.Log.LogInfo("表白成功，isGirlfriend=true");
+                return;
+            }
+            if (reply.Contains("[EVENT:DIVORCE]"))
+            {
+                AITalkPlugin.Instance.TriggerTalkEvent(talkScene, 2);
+                AITalkPlugin.Log.LogInfo("分手触发");
+                return;
+            }
+            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "Talk")
+            {
+                AITalkPlugin.Log.LogInfo("非Talk场景，跳过事件触发");
                 return;
             }
 
