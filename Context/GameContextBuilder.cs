@@ -70,13 +70,26 @@ namespace KKAITalk.Context
                     sb.Append("你暗恋着玩家，说话时会不自觉地在意对方，但还没有表白。");
                 else if (chara.IsStaff)
                     sb.Append("你是玩家恋爱社团的成员，关系比普通同学更近一些。");
-                else if (chara.Favor >= 80)
-                    sb.Append("你和玩家是非常要好的朋友，说话轻松随意。");
-                else if (chara.Favor >= 40)
-                    sb.Append("你和玩家是普通朋友，说话友好但保持距离。");
+                else if (chara.Relation >= 1)
+                {
+                    // 朋友阶段，用favor判断深度
+                    if (chara.Favor >= 75)
+                        sb.Append("你和玩家是非常要好的朋友，无话不说，说话轻松随意。");
+                    else if (chara.Favor >= 40)
+                        sb.Append("你和玩家是好朋友，说话友好轻松。");
+                    else
+                        sb.Append("你和玩家是普通朋友，说话友好但保持一定距离。");
+                }
                 else
-                    sb.Append("你和玩家几乎不认识，说话礼貌但略显冷淡。");
-
+                {
+                    // 陌生人阶段，用favor判断深度
+                    if (chara.Favor >= 75)
+                        sb.Append("你和玩家已经比较熟悉了，说话开始变得随意，但还不算朋友。");
+                    else if (chara.Favor >= 40)
+                        sb.Append("你和玩家有过几次交流，说话礼貌带点熟悉感。");
+                    else
+                        sb.Append("你和玩家几乎不认识，说话礼貌但略显冷淡。");
+                }
                 // 非恋人状态下的亲密度描述
                 if (chara.Intimacy >= 100)
                     sb.Append("你们是无话不说的最好朋友，完全没有隔阂，但仅限于友情。");

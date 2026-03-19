@@ -36,36 +36,29 @@ namespace KKAITalk
         }
         private void DumpHeroineStatus()
         {
-            AITalkPlugin.Log.LogInfo("=== Heroine Status ===");
-            
-
             var saveData = Manager.Game.Instance?.saveData;
-            if (saveData == null)
-            {
-                AITalkPlugin.Log.LogWarning("saveData为null");
-                return;
-            }
+            if (saveData == null) return;
 
-            var heroines = saveData.heroineList;
-            if (heroines == null || heroines.Count == 0)
-            {
-                AITalkPlugin.Log.LogWarning("没有找到heroine");
-                return;
-            }
-
-            // HExperience测试
             var testHeroine = saveData.heroineList[0];
-            AITalkPlugin.Log.LogInfo($"HExperience类型: {testHeroine.HExperience.GetType().FullName}");
-            AITalkPlugin.Log.LogInfo($"HExperience当前值: {testHeroine.HExperience}");
 
-            // 反射列出HExperienceKind的所有可能值
-            var enumType = testHeroine.HExperience.GetType();
-            AITalkPlugin.Log.LogInfo("HExperienceKind所有枚举值:");
-            foreach (var val in Enum.GetValues(enumType))
-                AITalkPlugin.Log.LogInfo($"  {val} = {(int)val}");
-
-
-            AITalkPlugin.Log.LogInfo("=== End ===");
+            // 加在这里
+            var talkScene = FindObjectOfType<TalkScene>();
+            if (talkScene != null && talkScene.targetHeroine != null)
+            {
+                var heroine = talkScene.targetHeroine;
+                var relationProp = heroine.GetType().GetProperty("relation",
+                    System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Instance);
+                try
+                {
+                    AITalkPlugin.Log.LogInfo($"TalkScene heroine relation = {relationProp.GetValue(heroine, null)}");
+                }
+                catch
+                {
+                    AITalkPlugin.Log.LogWarning("relation读取失败");
+                }
+            }
         }
         private void Start()
         {

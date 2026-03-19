@@ -29,6 +29,17 @@ namespace KKAITalk.Context
         {
             if (heroine == null) return null;
 
+            int relation = 0;
+            var relationProp = heroine.GetType().GetProperty("relation",
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance);
+            try
+            {
+                relation = (int)relationProp.GetValue(heroine, null);
+            }
+            catch { }
+
             return new CharacterContext
             {
                 Name = heroine.Name,

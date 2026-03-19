@@ -25,6 +25,7 @@ namespace KKAITalk.Context
         public int Anger;
         public bool Confessed;
         public bool IsFirstGirlfriend;
+        public int Relation;
 
         // 亲密度
         public int Intimacy;
