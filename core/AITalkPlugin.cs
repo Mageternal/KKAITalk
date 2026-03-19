@@ -152,8 +152,9 @@ namespace KKAITalk
 
             if (scene.name == "Talk")
             {
-                AIDialogueUI.Instance?.Hide();
-                _talkSceneWasLoaded = false;
+                _talkSceneWasLoaded = true;
+                _sceneBeforeTalk = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+                Invoke("OnTalkSceneReady", 0.1f);
             }
             //吃饭场景
             if (scene.name == "DiningRoom")
@@ -365,11 +366,11 @@ namespace KKAITalk
                 else
                 {
                     _talkSceneWasLoaded = false;
-                    // 不重置_eventTriggered，让OnSceneLoaded里的DiningRoom判断能用到它
                 }
+
                 if (_sceneBeforeTalk == "LibraryRoom" || _sceneBeforeTalk == "1-1" ||
-                _sceneBeforeTalk == "2-1" || _sceneBeforeTalk == "2-2" ||
-                _sceneBeforeTalk == "3-1")
+                    _sceneBeforeTalk == "2-1" || _sceneBeforeTalk == "2-2" ||
+                    _sceneBeforeTalk == "3-1")
                 {
                     if (_eventTriggered)
                     {
@@ -378,7 +379,7 @@ namespace KKAITalk
                         Invoke("OnEventSceneReady", 1f);
                     }
                 }
-                else if (_sceneBeforeTalk == "Ground" && _eventTriggered)
+                else if (_sceneBeforeTalk == "Ground" && _eventTriggered && _pendingEventScene != "GoHome")
                 {
                     _eventTriggered = false;
                     _pendingEventScene = "Exercise";
@@ -394,14 +395,6 @@ namespace KKAITalk
                 {
                     _eventTriggered = false;
                     _pendingEventScene = "Club";
-                    Invoke("OnEventSceneReady", 1f);
-                }
-                // Courtyard（回家）不会出现在_sceneBeforeTalk里，无需反向处理
-                // 但保留兜底以防边缘情况
-                else if (_sceneBeforeTalk == "Courtyard" && _eventTriggered)
-                {
-                    _eventTriggered = false;
-                    _pendingEventScene = "GoHome";
                     Invoke("OnEventSceneReady", 1f);
                 }
             }
