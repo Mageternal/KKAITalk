@@ -115,7 +115,9 @@ namespace KKAITalk
 
                     // UI和历史记录用cleanReply
                     AIDialogueUI.Instance?.ShowReply(cleanReply);
-                    history.Add(new ChatMessage { role = "user", content = playerInput });
+                    string cleanInput = System.Text.RegularExpressions.Regex.Replace(
+                     playerInput, @"\[system\]:\[.*?\]", "").Trim();
+                    history.Add(new ChatMessage { role = "user", content = cleanInput });
                     history.Add(new ChatMessage { role = "assistant", content = cleanReply });
                     MemoryManager.SaveHistory(saveId, _currentChara.CharaId, history);
 
@@ -172,18 +174,25 @@ namespace KKAITalk
                 AITalkPlugin.Log.LogInfo("约会约定成功，isDate=true");
                 return;
             }
+            if (reply.Contains("[EVENT:GOHOME]"))
+            {
+                AITalkPlugin.Instance.TriggerTalkEvent(talkScene, 6);
+                AITalkPlugin.Log.LogInfo("回家触发");
+                return;
+            }
             if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "Talk")
             {
                 AITalkPlugin.Log.LogInfo("非Talk场景，跳过事件触发");
                 return;
             }
+            
 
             int index = -1;
             if (reply.Contains("[EVENT:DIVORCE]")) index = 2;
             else if(reply.Contains("[EVENT:H]")) index = 3;
             else if (reply.Contains("[EVENT:LUNCH]")) index = 4;
             else if (reply.Contains("[EVENT:CLUB]")) index = 5;
-            else if (reply.Contains("[EVENT:GOHOME]")) index = 6;
+            //else if (reply.Contains("[EVENT:GOHOME]")) index = 6;
             else if (reply.Contains("[EVENT:DATE]")) index = 7;
             else if (reply.Contains("[EVENT:STUDY]")) index = 8;
             else if (reply.Contains("[EVENT:EXERCISE]")) index = 9;

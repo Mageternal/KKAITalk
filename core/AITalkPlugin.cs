@@ -201,6 +201,17 @@ namespace KKAITalk
                     Invoke("OnEventSceneReady", 1f);
                 }
             }
+            // 回家场景（MyRoom是中间过渡场景，忽略；Courtyard才是实际回家场景）
+            if (scene.name == "Courtyard")
+            {
+                AITalkPlugin.Log.LogInfo($"Courtyard加载, _eventTriggered={_eventTriggered}, _sceneBeforeTalk={_sceneBeforeTalk}");
+                if (_eventTriggered && _sceneBeforeTalk != "Courtyard")
+                {
+                    _eventTriggered = false;
+                    _pendingEventScene = "GoHome";
+                    Invoke("OnEventSceneReady", 1f);
+                }
+            }
         }
         
         private GameObject FindMsgWindowCanvas()
@@ -316,10 +327,11 @@ namespace KKAITalk
         {
             switch (sceneName)
             {
-                case "DiningRoom": return "[system]:[你们正在一起吃午饭，请用一句话说一句符合当前场景的开场白。]";
-                case "Study": return "[system]:[你们正在一起学习，话题围绕学习内容展开，请说一句符合当前场景的开场白。]";
-                case "Exercise": return "[system]:[你们正在一起运动，话题围绕运动感受展开，请说一句符合当前场景的开场白。]";
-                case "Club": return "[system]:[你们正在进行恋爱练习，请说一句符合当前场景的开场白。]";
+                case "DiningRoom": return "[situation]:[你们正在一起吃午饭，请用一句话说一句符合当前场景的开场白。]";
+                case "Study": return "[situation]:[你们正在一起学习，话题围绕学习内容展开，请说一句符合当前场景的开场白。]";
+                case "Exercise": return "[situation]:[你们正在一起运动，话题围绕运动感受展开，请说一句符合当前场景的开场白。]";
+                case "Club": return "[situation]:[你们正在进行恋爱练习，请说一句符合当前场景的开场白。]";
+                case "GoHome": return "[situation]:[放学后你们正一起走在回家的路上，请用一句话说一句符合当前场景的开场白。]";
                 default: return "";
             }
         }
@@ -328,10 +340,11 @@ namespace KKAITalk
         {
             switch (sceneName)
             {
-                case "DiningRoom": return " [system]:[午饭快结束了，请用一句话自然地结束这次用餐。]";
-                case "Study": return " [system]:[学习时间快结束了，请用一句话自然地结束这次学习。]";
-                case "Exercise": return " [system]:[运动快结束了，请用一句话自然地结束这次运动。]";
-                case "Club": return " [system]:[社团活动快结束了，请用一句话自然地结束这次恋爱练习。]";
+                case "DiningRoom": return " [situation]:[午饭快结束了，请用一句话自然地结束这次用餐。]";
+                case "Study": return " [situation]:[学习时间快结束了，请用一句话自然地结束这次学习。]";
+                case "Exercise": return " [situation]:[运动快结束了，请用一句话自然地结束这次运动。]";
+                case "Club": return " [situation]:[社团活动快结束了，请用一句话自然地结束这次恋爱练习。]";
+                case "GoHome": return " [situation]:[快要走到家了，请用一句话自然地道别结束这次回家路上的对话。]";
                 default: return "";
             }
         }
@@ -381,6 +394,14 @@ namespace KKAITalk
                 {
                     _eventTriggered = false;
                     _pendingEventScene = "Club";
+                    Invoke("OnEventSceneReady", 1f);
+                }
+                // Courtyard（回家）不会出现在_sceneBeforeTalk里，无需反向处理
+                // 但保留兜底以防边缘情况
+                else if (_sceneBeforeTalk == "Courtyard" && _eventTriggered)
+                {
+                    _eventTriggered = false;
+                    _pendingEventScene = "GoHome";
                     Invoke("OnEventSceneReady", 1f);
                 }
             }

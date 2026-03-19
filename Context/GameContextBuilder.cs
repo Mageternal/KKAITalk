@@ -14,9 +14,20 @@ namespace KKAITalk.Context
         public static List<ChatMessage> BuildMessages(CharacterContext chara, string userInput, List<ChatMessage> history = null)
         {
             string systemPrompt = BuildSystemPrompt(chara);
+            // 从userInput里提取[system]指令追加到system prompt
+            string extraSystem = "";
+            var sysMatch = System.Text.RegularExpressions.Regex.Match(
+                userInput, @"\[situation\]:\[(.+?)\]");
+            if (sysMatch.Success)
+                extraSystem = "当前场景：" + sysMatch.Groups[1].Value + "请根据以上场景自然地说一句符合角色性格的话，不要提及场景描述本身。";
+
+            string cleanUserInput = System.Text.RegularExpressions.Regex.Replace(
+                userInput, @"\[situation\]:\[.*?\]", "").Trim();
+
             var messages = new List<ChatMessage>
             {
-                new ChatMessage { role = "system", content = systemPrompt }
+                new ChatMessage { role = "system", content = systemPrompt +
+                    (string.IsNullOrEmpty(extraSystem) ? "" : extraSystem) }
             };
 
             // 插入历史记录
