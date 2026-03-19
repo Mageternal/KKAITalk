@@ -152,7 +152,7 @@ namespace KKAITalk
         }
         private void ParseAndTriggerEvent(string reply, TalkScene talkScene, SaveData.Heroine heroine)
         {
-            // 表白直接改布尔值，不受场景限制
+            // 直接修改布尔值，不受场景限制
             if (reply.Contains("[EVENT:CONFESS]"))
             {
                 heroine.isGirlfriend = true;
@@ -184,23 +184,20 @@ namespace KKAITalk
                 AITalkPlugin.Log.LogInfo("回家触发");
                 return;
             }
+
+            // 其他事件只在Talk场景触发
             if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "Talk")
             {
                 AITalkPlugin.Log.LogInfo("非Talk场景，跳过事件触发");
                 return;
             }
-            
 
             int index = -1;
-            if (reply.Contains("[EVENT:DIVORCE]")) index = 2;
-            else if(reply.Contains("[EVENT:H]")) index = 3;
+            if (reply.Contains("[EVENT:H]")) index = 3;
             else if (reply.Contains("[EVENT:LUNCH]")) index = 4;
             else if (reply.Contains("[EVENT:CLUB]")) index = 5;
-            //else if (reply.Contains("[EVENT:GOHOME]")) index = 6;
-            else if (reply.Contains("[EVENT:DATE]")) index = 7;
             else if (reply.Contains("[EVENT:STUDY]")) index = 8;
             else if (reply.Contains("[EVENT:EXERCISE]")) index = 9;
-            else if (reply.Contains("[EVENT:JOIN]")) index = 10;
             else if (reply.Contains("[EVENT:FOLLOW]")) index = 11;
 
             if (index < 0) return;
