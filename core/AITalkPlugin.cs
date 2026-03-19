@@ -148,6 +148,22 @@ namespace KKAITalk
                     Invoke("OnEventSceneReady", 1f);
                 }
             }
+            // 学习场景
+            if ((scene.name == "LibraryRoom" || scene.name == "1-1" ||
+                 scene.name == "2-1" || scene.name == "2-2" || scene.name == "3-1")
+                && _eventTriggered && _sceneBeforeTalk != scene.name)
+            {
+                _eventTriggered = false;
+                _pendingEventScene = "Study";
+                Invoke("OnEventSceneReady", 1f);
+            }
+            // 运动场景
+            if (scene.name == "Ground" && _eventTriggered && _sceneBeforeTalk != "Ground")
+            {
+                _eventTriggered = false;
+                _pendingEventScene = "Exercise";
+                Invoke("OnEventSceneReady", 1f);
+            }
         }
         private GameObject FindMsgWindowCanvas()
         {
@@ -195,9 +211,8 @@ namespace KKAITalk
 
                         AITalkPlugin.OnReplyReceived = () =>
                         {
-                            AITalkPlugin.Log.LogInfo("OnReplyReceived触发，准备调用FinishDiningRoom");
-                            if (_pendingEventScene == "DiningRoom")
-                                AITalkPlugin.Instance.Invoke("FinishDiningRoom", 0.5f);
+                            AITalkPlugin.Log.LogInfo("OnReplyReceived触发，准备调用FinishEventScene");
+                            Invoke("FinishEventScene", 3f);
                         };
                         AITalkPlugin.Log.LogInfo("OnReplyReceived已赋值");
 
@@ -221,32 +236,42 @@ namespace KKAITalk
 
 
         }
-        private void FinishDiningRoom()
+        private void TryClickSkipSoft()
         {
-            AITalkPlugin.Log.LogInfo("FinishDiningRoom执行");
             var msgWindow = FindMsgWindowCanvas();
-            AITalkPlugin.Log.LogInfo($"FindMsgWindowCanvas结果: {msgWindow?.name ?? "null"}");
+            if (msgWindow == null) return;
+
+            if (!msgWindow.activeInHierarchy)
+                msgWindow.SetActive(true);
+
+            var skip = msgWindow.transform.Find("MsgWindow02/Buttons/Under_BG/Under_Right/Skip");
+            if (skip != null && skip.gameObject.activeInHierarchy)
+            {
+                var pointer = new UnityEngine.EventSystems.PointerEventData(
+                    UnityEngine.EventSystems.EventSystem.current);
+                UnityEngine.EventSystems.ExecuteEvents.Execute(
+                    skip.gameObject, pointer,
+                    UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler);
+                AITalkPlugin.Log.LogInfo("TryClickSkipSoft: 模拟点击Skip");
+            }
+        }
+        private void FinishEventScene()
+        {
+            AITalkPlugin.Log.LogInfo("FinishEventScene执行");
+            var msgWindow = FindMsgWindowCanvas();
             if (msgWindow != null)
             {
                 msgWindow.SetActive(true);
-                AITalkPlugin.Log.LogInfo($"SetActive后active: {msgWindow.activeInHierarchy}");
-                InvokeRepeating("TryClickSkip", 0f, 0.3f);
+                AITalkPlugin.Log.LogInfo("显示原对话框，开始快进");
+                InvokeRepeating("TryClickSkipSoft", 0f, 0.3f);
             }
-            Invoke("FinishDiningRoomFinal", 3f);
+            Invoke("FinishEventSceneFinal", 3f);
         }
 
-        private void FinishDiningRoomFinal()
+        private void FinishEventSceneFinal()
         {
-            AITalkPlugin.Log.LogInfo("FinishDiningRoomFinal执行");
-            CancelInvoke("TryClickSkip");
-            var msgWindow = FindMsgWindowCanvas();
-            AITalkPlugin.Log.LogInfo($"FinishDiningRoomFinal FindMsgWindowCanvas: {msgWindow?.name ?? "null"}, active={msgWindow?.activeInHierarchy}");
-            if (msgWindow != null)
-            {
-                msgWindow.SetActive(true);
-                InvokeRepeating("TryClickSkip", 0f, 0.3f);
-                AITalkPlugin.Log.LogInfo("开始快进脱离场景");
-            }
+            AITalkPlugin.Log.LogInfo("FinishEventSceneFinal执行");
+            CancelInvoke("TryClickSkipSoft");
             AIDialogueUI.Instance?.Hide();
         }
         private string GetAutoInput(string sceneName)
@@ -254,6 +279,8 @@ namespace KKAITalk
             switch (sceneName)
             {
                 case "DiningRoom": return "[system]:[你们正在一起吃午饭，请用一句话描述此刻的心情或说一句开场白。]";
+                case "Study": return "[system]:[你们正在一起学习，请用一句话描述此刻的心情或说一句开场白。]";
+                case "Exercise": return "[system]:[你们正在一起运动，请用一句话描述此刻的心情或说一句开场白。]";
                 default: return "";
             }
         }
@@ -263,6 +290,8 @@ namespace KKAITalk
             switch (sceneName)
             {
                 case "DiningRoom": return " [system]:[这是午饭的最后一句对话，请用一句话结束这顿饭，表达吃完了或者该离开了。]";
+                case "Study": return " [system]:[这是学习的最后一句对话，请用一句话结束这次学习，表达学完了或者该回去了。]";
+                case "Exercise": return " [system]:[这是运动的最后一句对话，请用一句话结束这次运动，表达运动完了或者该回去了。]";
                 default: return "";
             }
         }
@@ -284,6 +313,23 @@ namespace KKAITalk
                 {
                     _talkSceneWasLoaded = false;
                     // 不重置_eventTriggered，让OnSceneLoaded里的DiningRoom判断能用到它
+                }
+                if (_sceneBeforeTalk == "LibraryRoom" || _sceneBeforeTalk == "1-1" ||
+                _sceneBeforeTalk == "2-1" || _sceneBeforeTalk == "2-2" ||
+                _sceneBeforeTalk == "3-1")
+                {
+                    if (_eventTriggered)
+                    {
+                        _eventTriggered = false;
+                        _pendingEventScene = "Study";
+                        Invoke("OnEventSceneReady", 1f);
+                    }
+                }
+                else if (_sceneBeforeTalk == "Ground" && _eventTriggered)
+                {
+                    _eventTriggered = false;
+                    _pendingEventScene = "Exercise";
+                    Invoke("OnEventSceneReady", 1f);
                 }
             }
         }
