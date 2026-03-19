@@ -36,6 +36,7 @@ namespace KKAITalk.Context
         public bool IsVirgin;
         public bool IsAnalVirgin;
         public bool IsKiss;
+        public SaveData.Heroine.HExperienceKind HExperience;
 
     }
 }

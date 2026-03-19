@@ -53,6 +53,8 @@ namespace KKAITalk.Context
                 IsVirgin = heroine.isVirgin,
                 IsAnalVirgin = heroine.isAnalVirgin,
                 IsKiss = heroine.isKiss,
+
+                HExperience = heroine.HExperience,
             };
         }
         public static string ReadProfileText(ChaFile chaFile)

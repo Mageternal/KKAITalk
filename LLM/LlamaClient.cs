@@ -30,6 +30,7 @@ namespace KKAITalk.LLM
 
         private IEnumerator SendCoroutine(List<ChatMessage> messages, Action<string> onSuccess, Action<string> onError)
         {
+            AITalkPlugin.Log.LogInfo("SendCoroutine开始被调用");
             string json = BuildJson(messages);
             byte[] body = new System.Text.UTF8Encoding(false).GetBytes(json);
 
@@ -39,22 +40,37 @@ namespace KKAITalk.LLM
             www.uploadHandler = uploadHandler;
             www.downloadHandler = new DownloadHandlerBuffer();
 
+            AITalkPlugin.Log.LogInfo("SendCoroutine.www装载完成");
+
             yield return www.Send();
+
+            AITalkPlugin.Log.LogInfo("SendCoroutine.www请求完成");
 
             if (www.isError)
             {
+                AITalkPlugin.Log.LogInfo("SendCoroutine.www，开始返回错误内容");
                 onError?.Invoke(www.error);
+                AITalkPlugin.Log.LogInfo("SendCoroutine.www错误内容返回完成");
             }
             else
             {
-                AITalkPlugin.Log.LogInfo("原始响应: " + www.downloadHandler.text);
+                AITalkPlugin.Log.LogInfo("SendCoroutine.www没有错误，即将输出原始响应");
+                //AITalkPlugin.Log.LogInfo("原始响应: " + www.downloadHandler.text);
+                AITalkPlugin.Log.LogInfo("原始响应(前200字): " + www.downloadHandler.text.Substring(0, Mathf.Min(200, www.downloadHandler.text.Length)));
                 string content = ExtractContent(www.downloadHandler.text);
-                if (content != null)
+                AITalkPlugin.Log.LogInfo($"ExtractContent结果: {content ?? "null"}");
+                if (content != null) {
+                    AITalkPlugin.Log.LogInfo("content不为null");
                     onSuccess?.Invoke(content);
-                else
+                }
+                else { 
                     onError?.Invoke("空响应");
+                }
+                AITalkPlugin.Log.LogInfo("出了content判断null");
             }
+            AITalkPlugin.Log.LogInfo("开始调用www.Dispose()");
             www.Dispose();
+            AITalkPlugin.Log.LogInfo("SendCoroutine函数结束");
         }
 
         private string BuildJson(List<ChatMessage> messages)

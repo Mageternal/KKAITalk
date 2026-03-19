@@ -5,6 +5,7 @@ using System.Linq;
 using UnityEngine;
 using static SaveData;
 using static Studio.Info.LightLoadInfo;
+using System.Collections;
 
 namespace KKAITalk
 {
@@ -18,7 +19,21 @@ namespace KKAITalk
             if (Input.GetKeyDown(KeyCode.F9))
                 DumpHeroineStatus();
         }
+        private void RunTest()
+        {
+            var talkScene = FindObjectOfType<TalkScene>();
+            if (talkScene == null) return;
 
+            // 探state枚举值
+            var necessaryInfo = talkScene.necessaryInfo;
+            var stateVal = necessaryInfo.state;
+            AITalkPlugin.Log.LogInfo($"state当前值: {stateVal}");
+
+            var enumType = stateVal.GetType();
+            AITalkPlugin.Log.LogInfo($"state类型: {enumType.FullName}");
+            foreach (var val in System.Enum.GetValues(enumType))
+                AITalkPlugin.Log.LogInfo($"  {val} = {(int)val}");
+        }
         private void DumpHeroineStatus()
         {
             AITalkPlugin.Log.LogInfo("=== Heroine Status ===");
@@ -38,12 +53,16 @@ namespace KKAITalk
                 return;
             }
 
+            // HExperience测试
             var testHeroine = saveData.heroineList[0];
+            AITalkPlugin.Log.LogInfo($"HExperience类型: {testHeroine.HExperience.GetType().FullName}");
+            AITalkPlugin.Log.LogInfo($"HExperience当前值: {testHeroine.HExperience}");
 
-            // 新增favor测试
-            AITalkPlugin.Log.LogInfo($"当前favor: {testHeroine.favor}");
-            testHeroine.favor = testHeroine.favor + 10;
-            AITalkPlugin.Log.LogInfo($"修改后favor: {testHeroine.favor}");
+            // 反射列出HExperienceKind的所有可能值
+            var enumType = testHeroine.HExperience.GetType();
+            AITalkPlugin.Log.LogInfo("HExperienceKind所有枚举值:");
+            foreach (var val in Enum.GetValues(enumType))
+                AITalkPlugin.Log.LogInfo($"  {val} = {(int)val}");
 
 
             AITalkPlugin.Log.LogInfo("=== End ===");
@@ -85,38 +104,47 @@ namespace KKAITalk
                 catch { }
             }
         }
-        private void RunTest()
+        private void DumpEventButtons()
         {
-            AITalkPlugin.Log.LogInfo("=== TestRunner 开始 ===");
-
-            // 方案1：在CharaMaker里按F8，直接拿Maker角色
-            if (MakerAPI.InsideMaker)
-            {
-                var chaCtrl = MakerAPI.GetCharacterControl();
-                if (chaCtrl != null)
-                {
-                    AITalkPlugin.Log.LogInfo($"Maker角色: {chaCtrl.fileParam.fullname}");
-                    DumpExtData(chaCtrl.chaFile);
-                }
-                return;
-            }
-
-            // 方案2：在游戏里按F8，遍历场景里所有ChaControl
-            var allCharas = FindObjectsOfType<ChaControl>();
-            if (allCharas == null || allCharas.Length == 0)
-            {
-                AITalkPlugin.Log.LogWarning("场景里没有找到ChaControl");
-                return;
-            }
-
-            foreach (var chara in allCharas)
-            {
-                AITalkPlugin.Log.LogInfo($"--- 角色: {chara.fileParam.fullname} ---");
-                DumpExtData(chara.chaFile);
-            }
-
-            AITalkPlugin.Log.LogInfo("=== TestRunner 结束 ===");
+            StartCoroutine(AutoClickEvent(1));
         }
+
+        private IEnumerator AutoClickEvent(int index)
+        {
+            var talkScene = FindObjectOfType<TalkScene>();
+            if (talkScene == null) yield break;
+
+            var type = talkScene.GetType();
+
+            // 先点击buttonEvent展开列表
+            var btnEventField = type.GetField("buttonEvent",
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance);
+            var btnEvent = btnEventField.GetValue(talkScene) as UnityEngine.UI.Button;
+            if (btnEvent != null)
+            {
+                btnEvent.onClick.Invoke();
+                AITalkPlugin.Log.LogInfo("展开Event列表");
+            }
+
+            yield return new WaitForSeconds(0.3f);
+
+            // 点击指定索引的按钮
+            var field = type.GetField("buttonEventContents",
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance);
+            var buttons = field.GetValue(talkScene) as UnityEngine.UI.Button[];
+            if (buttons == null || index >= buttons.Length) yield break;
+
+            if (buttons[index] != null && buttons[index].gameObject.activeInHierarchy)
+            {
+                AITalkPlugin.Log.LogInfo($"点击按钮索引: {index}");
+                buttons[index].onClick.Invoke();
+            }
+            else
+                AITalkPlugin.Log.LogWarning($"按钮{index}未激活");
+        }
+
 
         private void DumpExtData(ChaFile chaFile)
         {

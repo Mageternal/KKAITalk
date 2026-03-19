@@ -2,10 +2,11 @@
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using KKAITalk.Context;
+using KKAITalk;
 using KKAITalk.LLM;
 using KKAITalk.UI;
 using KKAPI.MainGame;
-using System.Collections;
+using System;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -19,9 +20,24 @@ namespace KKAITalk
         internal static ManualLogSource Log;
         internal static LlamaClient Client;
         internal static ConfigEntry<bool> UseThinking;
+        internal static AITalkPlugin Instance;
+        internal static SaveData.Heroine CurrentHeroine;
+        internal static ReplyReceivedDelegate OnReplyReceived;
+        private TalkScene _pendingTalkScene;
+        private int _pendingEventIndex;
+        private string _pendingEventScene = "";
+        private bool _isFirstEventInput = false;
+        private string _sceneBeforeTalk = "";
+        public delegate void ReplyReceivedDelegate();
+        private bool _talkSceneWasLoaded = false;
+        private bool _eventTriggered = false;
+
+
+
 
         private void Awake()
         {
+            Instance = this;
             var uiObj = new GameObject("AIDialogueUI");
             DontDestroyOnLoad(uiObj);
             uiObj.AddComponent<AIDialogueUI>();
@@ -49,12 +65,205 @@ namespace KKAITalk
 
             Log.LogInfo("GameController 注册完成");
         }
+        public void TriggerTalkEvent(TalkScene talkScene, int index)
+        {
+            _eventTriggered = true; // 标记是事件触发的
+            _pendingTalkScene = talkScene;
+            _pendingEventIndex = index;
+            var type = talkScene.GetType();
+            var btnEventField = type.GetField("buttonEvent",
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance);
+            var btnEvent = btnEventField.GetValue(talkScene) as UnityEngine.UI.Button;
+            if (btnEvent != null)
+                btnEvent.onClick.Invoke();
+
+            // 延迟3秒让AI回复显示完，再点击按钮
+            Invoke("ClickPendingEventButton", 3f);
+        }
+        private void ClickPendingEventButton()
+        {
+            if (_pendingTalkScene == null) return;
+            var type = _pendingTalkScene.GetType();
+            var field = type.GetField("buttonEventContents",
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance);
+            var buttons = field.GetValue(_pendingTalkScene) as UnityEngine.UI.Button[];
+            if (buttons == null || _pendingEventIndex >= buttons.Length) return;
+
+            if (buttons[_pendingEventIndex] != null && buttons[_pendingEventIndex].gameObject.activeInHierarchy)
+            {
+                buttons[_pendingEventIndex].onClick.Invoke();
+                AITalkPlugin.Log.LogInfo($"事件触发成功: index={_pendingEventIndex}");
+                // 开始轮询点击Skip
+                InvokeRepeating("TryClickSkip", 0.3f, 0.2f);
+            }
+            else
+                AITalkPlugin.Log.LogWarning($"按钮{_pendingEventIndex}未激活");
+
+            _pendingTalkScene = null;
+        }
+
+        private void TryClickSkip()
+        {
+            var msgWindow = FindMsgWindowCanvas();
+            if (msgWindow == null || !msgWindow.activeInHierarchy)
+            {
+                CancelInvoke("TryClickSkip");
+                AITalkPlugin.Log.LogInfo("MsgWindow已关闭，停止Skip轮询");
+                return;
+            }
+
+            var skip = msgWindow.transform.Find("MsgWindow02/Buttons/Under_BG/Under_Right/Skip");
+            if (skip != null && skip.gameObject.activeInHierarchy)
+            {
+                var pointer = new UnityEngine.EventSystems.PointerEventData(
+                    UnityEngine.EventSystems.EventSystem.current);
+                UnityEngine.EventSystems.ExecuteEvents.Execute(
+                    skip.gameObject, pointer,
+                    UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler);
+                AITalkPlugin.Log.LogInfo("TryClickSkip: 模拟点击Skip");
+            }
+        }
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
+            AITalkPlugin.Log.LogInfo($"场景加载: {scene.name}, mode={mode}");
+
             if (scene.name == "Talk")
             {
-                StartCoroutine(OnTalkSceneReady());
+                _talkSceneWasLoaded = true;
+                _sceneBeforeTalk = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+                Invoke("OnTalkSceneReady", 0.1f);
+            }
+
+            if (scene.name == "DiningRoom")
+            {
+                AITalkPlugin.Log.LogInfo($"DiningRoom加载, _talkSceneWasLoaded={_talkSceneWasLoaded}, _eventTriggered={_eventTriggered}, _sceneBeforeTalk={_sceneBeforeTalk}");
+                if (_eventTriggered && _sceneBeforeTalk != "DiningRoom")
+                {
+                    _talkSceneWasLoaded = false;
+                    _eventTriggered = false;
+                    _pendingEventScene = "DiningRoom";
+                    Invoke("OnEventSceneReady", 1f);
+                }
+            }
+        }
+        private GameObject FindMsgWindowCanvas()
+        {
+            var allCanvas = Resources.FindObjectsOfTypeAll<Canvas>();
+            foreach (var c in allCanvas)
+                if (c.name == "MsgWindowCanvas")
+                    return c.gameObject;
+            return null;
+        }
+        private void OnEventSceneReady()
+        {
+            AITalkPlugin.Log.LogInfo($"OnEventSceneReady执行, CurrentHeroine={CurrentHeroine?.Name ?? "null"}");
+            // 尝试隐藏原版对话框
+            var msgWindow = FindMsgWindowCanvas();
+            if (msgWindow != null)
+            {
+                msgWindow.SetActive(false);
+                AITalkPlugin.Log.LogInfo("隐藏原版对话框");
+            }
+            else
+                AITalkPlugin.Log.LogWarning("MsgWindowCanvas未找到");
+
+            if (CurrentHeroine == null)
+            {
+                AITalkPlugin.Log.LogWarning("OnEventSceneReady: CurrentHeroine为null");
+                return;
+            }
+
+            string charaName = CurrentHeroine.Name ?? "";
+
+            AIDialogueUI.Instance?.ShowInputMode(charaName);
+            AITalkPlugin.Log.LogInfo("事件场景AI模式开启");
+
+            var heroine = CurrentHeroine;
+            var controller = FindObjectOfType<AITalkGameController>();
+            if (controller != null)
+            {
+                AIDialogueUI.Instance.OnUserInput = (input) =>
+                {
+                    if (_isFirstEventInput)
+                    {
+                        _isFirstEventInput = false;
+                        string sysInput = input + GetFirstInputSuffix(_pendingEventScene);
+                        AITalkPlugin.Log.LogInfo($"第一次发言附加指令: {sysInput}");
+
+                        AITalkPlugin.OnReplyReceived = () =>
+                        {
+                            AITalkPlugin.Log.LogInfo("OnReplyReceived触发，准备调用FinishDiningRoom");
+                            if (_pendingEventScene == "DiningRoom")
+                                AITalkPlugin.Instance.Invoke("FinishDiningRoom", 0.5f);
+                        };
+                        AITalkPlugin.Log.LogInfo("OnReplyReceived已赋值");
+
+                        controller.OnTalkStart(heroine, sysInput);
+                    }
+                    else
+                    {
+                        controller.OnTalkStart(heroine, input);
+                    }
+                };
+                AITalkPlugin.Log.LogInfo("事件场景输入事件订阅完成");
+
+                string autoInput = GetAutoInput(_pendingEventScene);
+                if (!string.IsNullOrEmpty(autoInput))
+                {
+                    _isFirstEventInput = true;
+                    AITalkPlugin.Log.LogInfo($"AI主动发言触发: {autoInput}");
+                    controller.OnTalkStart(heroine, autoInput);
+                }
+            }
+
+
+        }
+        private void FinishDiningRoom()
+        {
+            AITalkPlugin.Log.LogInfo("FinishDiningRoom执行");
+            var msgWindow = FindMsgWindowCanvas();
+            AITalkPlugin.Log.LogInfo($"FindMsgWindowCanvas结果: {msgWindow?.name ?? "null"}");
+            if (msgWindow != null)
+            {
+                msgWindow.SetActive(true);
+                AITalkPlugin.Log.LogInfo($"SetActive后active: {msgWindow.activeInHierarchy}");
+                InvokeRepeating("TryClickSkip", 0f, 0.3f);
+            }
+            Invoke("FinishDiningRoomFinal", 3f);
+        }
+
+        private void FinishDiningRoomFinal()
+        {
+            AITalkPlugin.Log.LogInfo("FinishDiningRoomFinal执行");
+            CancelInvoke("TryClickSkip");
+            var msgWindow = FindMsgWindowCanvas();
+            AITalkPlugin.Log.LogInfo($"FinishDiningRoomFinal FindMsgWindowCanvas: {msgWindow?.name ?? "null"}, active={msgWindow?.activeInHierarchy}");
+            if (msgWindow != null)
+            {
+                msgWindow.SetActive(true);
+                InvokeRepeating("TryClickSkip", 0f, 0.3f);
+                AITalkPlugin.Log.LogInfo("开始快进脱离场景");
+            }
+            AIDialogueUI.Instance?.Hide();
+        }
+        private string GetAutoInput(string sceneName)
+        {
+            switch (sceneName)
+            {
+                case "DiningRoom": return "[system]:[你们正在一起吃午饭，请用一句话描述此刻的心情或说一句开场白。]";
+                default: return "";
+            }
+        }
+
+        private string GetFirstInputSuffix(string sceneName)
+        {
+            switch (sceneName)
+            {
+                case "DiningRoom": return " [system]:[这是午饭的最后一句对话，请用一句话结束这顿饭，表达吃完了或者该离开了。]";
+                default: return "";
             }
         }
 
@@ -63,115 +272,86 @@ namespace KKAITalk
             if (scene.name == "Talk")
             {
                 AIDialogueUI.Instance?.Hide();
+
+                if (_sceneBeforeTalk == "DiningRoom" && _eventTriggered)
+                {
+                    _eventTriggered = false;
+                    AITalkPlugin.Log.LogInfo("Talk结束，直接回到DiningRoom");
+                    _pendingEventScene = "DiningRoom";
+                    Invoke("OnEventSceneReady", 1f);
+                }
+                else
+                {
+                    _talkSceneWasLoaded = false;
+                    // 不重置_eventTriggered，让OnSceneLoaded里的DiningRoom判断能用到它
+                }
             }
         }
 
-        private System.Collections.IEnumerator OnTalkSceneReady()
+        private void OnTalkSceneReady()
         {
-            yield return null;
-            var talkScene = FindObjectOfType<TalkScene>();
-            if (talkScene == null) yield break;
+            _elapsed = 0f;
+            InvokeRepeating("WaitForMsgWindow", 0f, 0.1f);
+        }
 
-
-            var saveData = Manager.Game.Instance?.saveData;
-            string accName = saveData?.accademyName ?? "default";
-            string savePath = SaveData.Path ?? "";
-            string saveFileName = System.IO.Path.GetFileNameWithoutExtension(savePath);
-
-            // 最终存档文件夹名：学校名_存档文件名
-            string saveId = string.IsNullOrEmpty(saveFileName)
-                ? accName
-                : accName + "_" + saveFileName;
-
-            AITalkPlugin.Log.LogInfo("存档ID: " + saveId);
-
-            // 轮询等待MsgWindowCanvas激活
-            GameObject msgWindowCanvas = null;
-            float elapsed = 0f;
-            while (elapsed < 5f)
+        private float _elapsed = 0f;
+        private void WaitForMsgWindow()
+        {
+            _elapsed += 0.1f;
+            if (_elapsed > 5f)
             {
-                var all = Resources.FindObjectsOfTypeAll<GameObject>();
-                foreach (var obj in all)
+                CancelInvoke("WaitForMsgWindow");
+                _elapsed = 0f;
+                return;
+            }
+
+            var all = Resources.FindObjectsOfTypeAll<GameObject>();
+            foreach (var obj in all)
+            {
+                if (obj.name == "MsgWindowCanvas" && obj.activeInHierarchy)
                 {
-                    if (obj.name == "MsgWindowCanvas" && obj.activeInHierarchy)
-                    {
-                        msgWindowCanvas = obj;
-                        break;
-                    }
+                    CancelInvoke("WaitForMsgWindow");
+                    _elapsed = 0f;
+                    OnMsgWindowReady();
+                    return;
                 }
-                if (msgWindowCanvas != null) break;
-                elapsed += 0.1f;
-                yield return new WaitForSeconds(0.1f);
             }
+        }
+        private void OnMsgWindowReady()
+        {
+            var talkScene = FindObjectOfType<TalkScene>();
+            if (talkScene == null) return;
 
-            if (msgWindowCanvas != null)
-            {
-                var skip = msgWindowCanvas.transform.Find(
-                    "MsgWindow02/Buttons/Under_BG/Under_Right/Skip");
+            // 延迟后开始轮询点击Skip
+            Invoke("StartSkipping", 1f);
 
-                //if (skip != null && skip.gameObject.activeInHierarchy)
-                //{
-                //    var pointer = new UnityEngine.EventSystems.PointerEventData(
-                //        UnityEngine.EventSystems.EventSystem.current);
-                //    UnityEngine.EventSystems.ExecuteEvents.Execute(
-                //        skip.gameObject, pointer,
-                //        UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler);
-                //    AITalkPlugin.Log.LogInfo("点击Skip，等待对话自然结束");
-
-                //    // 等对话自然结束
-                //    yield return new WaitForSeconds(1f);
-                //}
-                //else
-                //    AITalkPlugin.Log.LogWarning("Skip未激活，跳过");
-
-                // 不再主动SetActive(false)
-            }
-
-            // 开启AI模式
             string charaName = talkScene.targetHeroine?.Name ?? "";
             AIDialogueUI.Instance?.ShowInputMode(charaName);
             AITalkPlugin.Log.LogInfo("AI模式自动开启");
 
             var controller = FindObjectOfType<AITalkGameController>();
+            AITalkPlugin.Log.LogInfo($"controller是否为null: {controller == null}");
+
             if (controller != null && talkScene.targetHeroine != null)
             {
                 var heroine = talkScene.targetHeroine;
+                CurrentHeroine = heroine;
                 AIDialogueUI.Instance.OnUserInput = (input) =>
                 {
                     controller.OnTalkStart(heroine, input);
                 };
                 AITalkPlugin.Log.LogInfo("输入事件订阅完成，等待玩家输入");
             }
-        }
-
-        private IEnumerator HoldCtrlToSkip()
-        {
-            yield return new WaitForSeconds(0.5f);
-
-            // 打印ADVScene下所有激活对象
-            var advScene = GameObject.Find("ADVScene");
-            if (advScene != null)
-            {
-                AITalkPlugin.Log.LogInfo("ADVScene found, active: " + advScene.activeInHierarchy);
-                PrintChildren(advScene.transform, 0);
-            }
             else
-                AITalkPlugin.Log.LogWarning("ADVScene未找到");
+                AITalkPlugin.Log.LogWarning($"controller={controller == null}, heroine={talkScene.targetHeroine == null}");
         }
 
-        private IEnumerator SkipGreeting()
+        private void StartSkipping()
         {
-            yield return new WaitForSeconds(1f);
-
-            var talkCanvas = GameObject.Find("TalkScene/Canvas");
-            var msgWindow = talkCanvas?.transform.Find("MsgWindow0");
-
-            AITalkPlugin.Log.LogInfo("MsgWindow0 active: " +
-                (msgWindow?.gameObject.activeInHierarchy.ToString() ?? "null"));
-            AITalkPlugin.Log.LogInfo("Button Talk active: " +
-                (talkCanvas?.transform.Find("Button Talk")?.gameObject.activeInHierarchy.ToString() ?? "null"));
+            InvokeRepeating("TryClickSkip", 0f, 0.3f);
         }
 
+        
         private void PrintChildren(Transform t, int depth)
         {
             string indent = new string('-', depth * 2);

@@ -1,5 +1,6 @@
 ﻿using ActionGame;
 using KKAITalk.Context;
+using KKAITalk;
 using KKAITalk.LLM;
 using KKAITalk.Memory;
 using KKAITalk.UI;
@@ -42,7 +43,6 @@ namespace KKAITalk
             _currentChara.CurrentPeriod = _currentPeriod;
 
             AIDialogueUI.Instance?.ShowWaiting(_currentChara.Name);
-
             // 读取记忆
             string saveId = MemoryManager.GetSaveId();
             var history = MemoryManager.LoadHistory(saveId, _currentChara.CharaId);
@@ -52,13 +52,18 @@ namespace KKAITalk
                 messages,
                 reply =>
                 {
-                    // 日志保留原始标签，方便调试
+                    // 日志保留原始标签
                     AITalkPlugin.Log.LogInfo($"[原始回复] {reply}");
 
                     // 清理标签
                     string cleanReply = System.Text.RegularExpressions.Regex.Replace(
-                        reply, @"\[APOLOGY:[^\]]+\]|\[FAVOR:[^\]]+\]|\[INTIMACY:[^\]]+\]", "").Trim();
+                        reply, @"\[APOLOGY:[^\]]+\]|\[FAVOR:[^\]]+\]|\[INTIMACY:[^\]]+\]|\[LEWD:[^\]]+\]|\[EVENT:[^\]]+\]", "").Trim();
                     cleanReply = cleanReply.Replace("\n", "").Replace("\r", "");
+
+                    // 触发游戏事件 ← 放这里
+                    var talkScene = UnityEngine.Object.FindObjectOfType<TalkScene>();
+                    if (talkScene != null)
+                        ParseAndTriggerEvent(reply, talkScene);
 
                     // 解析anger用原始reply
                     if (heroine.isAnger)
@@ -78,8 +83,8 @@ namespace KKAITalk
                         {
                             heroine.isAnger = true;
                             // 激怒角色时扣好感
-                            heroine.favor = Mathf.Clamp(heroine.favor - 5, 0, 100);
-                            AITalkPlugin.Log.LogInfo($"激怒角色，好感度-5，当前: {heroine.favor}");
+                            heroine.favor = Mathf.Clamp(heroine.favor - 10, 0, 100);
+                            AITalkPlugin.Log.LogInfo($"激怒角色，好感度-10，当前: {heroine.favor}");
                             AITalkPlugin.Log.LogInfo($"愤怒加剧，当前: {heroine.anger}");
                         }
                         else
@@ -106,18 +111,23 @@ namespace KKAITalk
                         }
                     }
 
+
                     // UI和历史记录用cleanReply
                     AIDialogueUI.Instance?.ShowReply(cleanReply);
                     history.Add(new ChatMessage { role = "user", content = playerInput });
                     history.Add(new ChatMessage { role = "assistant", content = cleanReply });
                     MemoryManager.SaveHistory(saveId, _currentChara.CharaId, history);
+
+                    AITalkPlugin.OnReplyReceived?.Invoke();
+                    AITalkPlugin.Log.LogInfo($"OnReplyReceived调用完成，是否为null: {AITalkPlugin.OnReplyReceived == null}");
+                    AITalkPlugin.OnReplyReceived = null;
                 },
                 err => AITalkPlugin.Log.LogError("请求失败: " + err)
             );
         }
         private int ParseIntimacyDelta(string reply)
         {
-            if (reply.Contains("[INTIMACY:UP]")) return +5;
+            if (reply.Contains("[INTIMACY:UP]")) return +10;
             return 0;
         }
         private int ParseAngerDelta(string reply)
@@ -134,6 +144,28 @@ namespace KKAITalk
             if (maxIdx == sorryIdx) return -100;
             return 0;
         }
+        private void ParseAndTriggerEvent(string reply, TalkScene talkScene)
+        {
+
+            int index = -1;
+            if (reply.Contains("[EVENT:CONFESS]")) index = 1;
+            else if (reply.Contains("[EVENT:H]")) index = 3;
+            else if (reply.Contains("[EVENT:LUNCH]")) index = 4;
+            else if (reply.Contains("[EVENT:CLUB]")) index = 5;
+            else if (reply.Contains("[EVENT:GOHOME]")) index = 6;
+            else if (reply.Contains("[EVENT:DATE]")) index = 7;
+            else if (reply.Contains("[EVENT:STUDY]")) index = 8;
+            else if (reply.Contains("[EVENT:EXERCISE]")) index = 9;
+            else if (reply.Contains("[EVENT:JOIN]")) index = 10;
+            else if (reply.Contains("[EVENT:FOLLOW]")) index = 11;
+
+            if (index < 0) return;
+
+            AITalkPlugin.Log.LogInfo($"触发事件索引: {index}");
+            AITalkPlugin.Instance.TriggerTalkEvent(talkScene, index);
+        }
+
+
         private Cycle.Type _currentPeriod;
 
         protected override void OnStartH(HSceneProc hSceneProc, bool freeH)

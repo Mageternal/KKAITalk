@@ -232,10 +232,13 @@ namespace KKAITalk.UI
         private void OnSendClicked()
         {
             string text = _inputField.text.Trim();
+            AITalkPlugin.Log.LogInfo($"OnSendClicked触发, text='{text}'");
+            AITalkPlugin.Log.LogInfo($"OnUserInput是否为null: {OnUserInput == null}");
             if (string.IsNullOrEmpty(text)) return;
 
             _inputField.text = "";
             OnUserInput?.Invoke(text);
+            AITalkPlugin.Log.LogInfo("OnUserInput已调用");
         }
 
         // Talk场景加载完成后，用游戏已有字体替换Arial
