@@ -212,8 +212,24 @@ namespace KKAITalk
                     Invoke("OnEventSceneReady", 1f);
                 }
             }
+            if (scene.name == "H")
+            {
+                // 延迟一下等场景加载完再关闭
+                Invoke("CloseSubtitles", 1f);
+            }
         }
-        
+        private void CloseSubtitles()
+        {
+            var allObjects = Resources.FindObjectsOfTypeAll<GameObject>();
+            foreach (var obj in allObjects)
+            {
+                if (obj.name == "KK_Subtitles_Caption")
+                {
+                    obj.SetActive(false);
+                    AITalkPlugin.Log.LogInfo("关闭字幕");
+                }
+            }
+        }
         private GameObject FindMsgWindowCanvas()
         {
             var allCanvas = Resources.FindObjectsOfTypeAll<Canvas>();
@@ -431,6 +447,13 @@ namespace KKAITalk
         }
         private void OnMsgWindowReady()
         {
+            // 重置事件场景状态
+            _isFirstEventInput = false;
+            _pendingEventScene = "";
+
+            // 关闭字幕
+            CloseSubtitles();
+
             var talkScene = FindObjectOfType<TalkScene>();
             if (talkScene == null) return;
 

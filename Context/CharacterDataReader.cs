@@ -38,6 +38,7 @@ namespace KKAITalk.Context
             {
                 relation = (int)relationProp.GetValue(heroine, null);
             }
+
             catch { }
 
             return new CharacterContext
@@ -64,6 +65,7 @@ namespace KKAITalk.Context
                 IsVirgin = heroine.isVirgin,
                 IsAnalVirgin = heroine.isAnalVirgin,
                 IsKiss = heroine.isKiss,
+                Relation = relation,
 
                 HExperience = heroine.HExperience,
             };

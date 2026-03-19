@@ -162,48 +162,60 @@ namespace KKAITalk
             if (reply.Contains("[EVENT:DIVORCE]"))
             {
                 AITalkPlugin.Instance.TriggerTalkEvent(talkScene, 2);
-                AITalkPlugin.Log.LogInfo("分手触发");
                 return;
             }
             if (reply.Contains("[EVENT:JOIN]"))
             {
                 heroine.isStaff = true;
-                AITalkPlugin.Log.LogInfo("加入社团成功，isStaff=true");
                 return;
             }
             if (reply.Contains("[EVENT:DATE]"))
             {
                 heroine.isDate = true;
-                AITalkPlugin.Log.LogInfo("约会约定成功，isDate=true");
+                return;
+            }
+
+            // 以下事件需要触发按钮，提前预设场景并直接触发
+            if (reply.Contains("[EVENT:H]"))
+            {
+                AITalkPlugin.Instance.TriggerTalkEvent(talkScene, 3);
+                return;
+            }
+            if (reply.Contains("[EVENT:LUNCH]"))
+            {
+                AITalkPlugin.Instance._pendingEventScene = "DiningRoom";
+                AITalkPlugin.Instance.TriggerTalkEvent(talkScene, 4);
+                return;
+            }
+            if (reply.Contains("[EVENT:CLUB]"))
+            {
+                AITalkPlugin.Instance._pendingEventScene = "StaffRoom";
+                AITalkPlugin.Instance.TriggerTalkEvent(talkScene, 5);
                 return;
             }
             if (reply.Contains("[EVENT:GOHOME]"))
             {
                 AITalkPlugin.Instance._pendingEventScene = "GoHome";
                 AITalkPlugin.Instance.TriggerTalkEvent(talkScene, 6);
-                AITalkPlugin.Log.LogInfo("回家触发");
                 return;
             }
-
-            // 其他事件只在Talk场景触发
-            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "Talk")
+            if (reply.Contains("[EVENT:STUDY]"))
             {
-                AITalkPlugin.Log.LogInfo("非Talk场景，跳过事件触发");
+                AITalkPlugin.Instance._pendingEventScene = "Study";
+                AITalkPlugin.Instance.TriggerTalkEvent(talkScene, 8);
                 return;
             }
-
-            int index = -1;
-            if (reply.Contains("[EVENT:H]")) index = 3;
-            else if (reply.Contains("[EVENT:LUNCH]")) index = 4;
-            else if (reply.Contains("[EVENT:CLUB]")) index = 5;
-            else if (reply.Contains("[EVENT:STUDY]")) index = 8;
-            else if (reply.Contains("[EVENT:EXERCISE]")) index = 9;
-            else if (reply.Contains("[EVENT:FOLLOW]")) index = 11;
-
-            if (index < 0) return;
-
-            AITalkPlugin.Log.LogInfo($"触发事件索引: {index}");
-            AITalkPlugin.Instance.TriggerTalkEvent(talkScene, index);
+            if (reply.Contains("[EVENT:EXERCISE]"))
+            {
+                AITalkPlugin.Instance._pendingEventScene = "Exercise";
+                AITalkPlugin.Instance.TriggerTalkEvent(talkScene, 9);
+                return;
+            }
+            if (reply.Contains("[EVENT:FOLLOW]"))
+            {
+                AITalkPlugin.Instance.TriggerTalkEvent(talkScene, 11);
+                return;
+            }
         }
 
 

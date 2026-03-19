@@ -21,18 +21,16 @@ namespace KKAITalk
         }
         private void RunTest()
         {
-            var talkScene = FindObjectOfType<TalkScene>();
-            if (talkScene == null) return;
-
-            // 探state枚举值
-            var necessaryInfo = talkScene.necessaryInfo;
-            var stateVal = necessaryInfo.state;
-            AITalkPlugin.Log.LogInfo($"state当前值: {stateVal}");
-
-            var enumType = stateVal.GetType();
-            AITalkPlugin.Log.LogInfo($"state类型: {enumType.FullName}");
-            foreach (var val in System.Enum.GetValues(enumType))
-                AITalkPlugin.Log.LogInfo($"  {val} = {(int)val}");
+            // 尝试关闭字幕
+            var allObjects = Resources.FindObjectsOfTypeAll<GameObject>();
+            foreach (var obj in allObjects)
+            {
+                if (obj.name == "KK_Subtitles_Caption")
+                {
+                    obj.SetActive(false);
+                    AITalkPlugin.Log.LogInfo($"关闭字幕: {obj.name}");
+                }
+            }
         }
         private void DumpHeroineStatus()
         {
