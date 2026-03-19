@@ -160,6 +160,18 @@ namespace KKAITalk
                 AITalkPlugin.Log.LogInfo("分手触发");
                 return;
             }
+            if (reply.Contains("[EVENT:JOIN]"))
+            {
+                heroine.isStaff = true;
+                AITalkPlugin.Log.LogInfo("加入社团成功，isStaff=true");
+                return;
+            }
+            if (reply.Contains("[EVENT:DATE]"))
+            {
+                heroine.isDate = true;
+                AITalkPlugin.Log.LogInfo("约会约定成功，isDate=true");
+                return;
+            }
             if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "Talk")
             {
                 AITalkPlugin.Log.LogInfo("非Talk场景，跳过事件触发");

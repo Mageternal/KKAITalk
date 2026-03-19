@@ -67,7 +67,6 @@ namespace KKAITalk
         }
         public void TriggerTalkEvent(TalkScene talkScene, int index)
         {
-            _eventTriggered = true; // 标记是事件触发的
             _pendingTalkScene = talkScene;
             _pendingEventIndex = index;
             var type = talkScene.GetType();
@@ -78,8 +77,31 @@ namespace KKAITalk
             if (btnEvent != null)
                 btnEvent.onClick.Invoke();
 
-            // 延迟3秒让AI回复显示完，再点击按钮
-            Invoke("ClickPendingEventButton", 3f);
+            // 先展开列表检查按钮是否激活
+            Invoke("CheckAndClickEventButton", 0.3f);
+        }
+
+        private void CheckAndClickEventButton()
+        {
+            if (_pendingTalkScene == null) return;
+            var type = _pendingTalkScene.GetType();
+            var field = type.GetField("buttonEventContents",
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance);
+            var buttons = field.GetValue(_pendingTalkScene) as UnityEngine.UI.Button[];
+            if (buttons == null || _pendingEventIndex >= buttons.Length) return;
+
+            if (buttons[_pendingEventIndex] != null && buttons[_pendingEventIndex].gameObject.activeInHierarchy)
+            {
+                _eventTriggered = true; // 确认按钮可用才设置
+                Invoke("ClickPendingEventButton", 3f);
+                AITalkPlugin.Log.LogInfo($"按钮{_pendingEventIndex}可用，延迟3秒点击");
+            }
+            else
+            {
+                AITalkPlugin.Log.LogWarning($"按钮{_pendingEventIndex}未激活，事件取消");
+                _pendingTalkScene = null;
+            }
         }
         private void ClickPendingEventButton()
         {
@@ -95,15 +117,13 @@ namespace KKAITalk
             {
                 buttons[_pendingEventIndex].onClick.Invoke();
                 AITalkPlugin.Log.LogInfo($"事件触发成功: index={_pendingEventIndex}");
-                // 开始轮询点击Skip
                 InvokeRepeating("TryClickSkip", 0.3f, 0.2f);
             }
             else
-                AITalkPlugin.Log.LogWarning($"按钮{_pendingEventIndex}未激活");
+                AITalkPlugin.Log.LogWarning($"按钮{_pendingEventIndex}点击时已失效");
 
             _pendingTalkScene = null;
         }
-
         private void TryClickSkip()
         {
             var msgWindow = FindMsgWindowCanvas();
@@ -170,7 +190,19 @@ namespace KKAITalk
                 _pendingEventScene = "Exercise";
                 Invoke("OnEventSceneReady", 1f);
             }
+            //社团活动室
+            if (scene.name == "StaffRoom")
+            {
+                AITalkPlugin.Log.LogInfo($"StaffRoom加载, _eventTriggered={_eventTriggered}, _sceneBeforeTalk={_sceneBeforeTalk}");
+                if (_eventTriggered && _sceneBeforeTalk != "StaffRoom")
+                {
+                    _eventTriggered = false;
+                    _pendingEventScene = "Club";
+                    Invoke("OnEventSceneReady", 1f);
+                }
+            }
         }
+        
         private GameObject FindMsgWindowCanvas()
         {
             var allCanvas = Resources.FindObjectsOfTypeAll<Canvas>();
@@ -287,6 +319,7 @@ namespace KKAITalk
                 case "DiningRoom": return "[system]:[你们正在一起吃午饭，请用一句话说一句符合当前场景的开场白。]";
                 case "Study": return "[system]:[你们正在一起学习，话题围绕学习内容展开，请说一句符合当前场景的开场白。]";
                 case "Exercise": return "[system]:[你们正在一起运动，话题围绕运动感受展开，请说一句符合当前场景的开场白。]";
+                case "Club": return "[system]:[你们正在进行恋爱练习，请说一句符合当前场景的开场白。]";
                 default: return "";
             }
         }
@@ -298,6 +331,7 @@ namespace KKAITalk
                 case "DiningRoom": return " [system]:[午饭快结束了，请用一句话自然地结束这次用餐。]";
                 case "Study": return " [system]:[学习时间快结束了，请用一句话自然地结束这次学习。]";
                 case "Exercise": return " [system]:[运动快结束了，请用一句话自然地结束这次运动。]";
+                case "Club": return " [system]:[社团活动快结束了，请用一句话自然地结束这次恋爱练习。]";
                 default: return "";
             }
         }
@@ -341,6 +375,12 @@ namespace KKAITalk
                 {
                     _eventTriggered = false;
                     _pendingEventScene = "Rooftop";
+                    Invoke("OnEventSceneReady", 1f);
+                }
+                else if (_sceneBeforeTalk == "StaffRoom" && _eventTriggered)
+                {
+                    _eventTriggered = false;
+                    _pendingEventScene = "Club";
                     Invoke("OnEventSceneReady", 1f);
                 }
             }

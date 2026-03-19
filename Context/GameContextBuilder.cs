@@ -61,6 +61,7 @@ namespace KKAITalk.Context
 
                 if (chara.IsFirstGirlfriend)
                     sb.Append("你是玩家的初恋，内心格外珍视这段感情。");
+                sb.Append("你们已经是恋人了，如果玩家再次表白，用恋人的身份温柔回应，不要输出[EVENT:CONFESS]。");
             }
             else
             {
@@ -143,19 +144,39 @@ namespace KKAITalk.Context
                     "[INTIMACY:UP]这次对话让你们更加了解彼此；" +
                     "[INTIMACY:NONE]普通对话，亲密度无变化。");
 
-                sb.Append("只有当玩家明确发出请求且你决定接受时，才在回复末尾附加对应标签，否则用[EVENT:NONE]：" +
-                    "[EVENT:CONFESS]你接受了表白；" +
-                    "[EVENT:H]你接受了H请求；" +
-                    "[EVENT:LUNCH]你同意一起吃午饭；" +
-                    "[EVENT:CLUB]你同意参加社团活动；" +
-                    "[EVENT:GOHOME]你同意一起回家；" +
-                    "[EVENT:DATE]你同意周末约会；" +
-                    "[EVENT:STUDY]你同意一起学习；" +
-                    "[EVENT:EXERCISE]你同意一起运动；" +
-                    "[EVENT:JOIN]你同意加入恋爱社团；" +
-                    "[EVENT:FOLLOW]你同意跟随；" +
-                    "[EVENT:NONE]无明确请求或你拒绝了请求。");
-                sb.Append("另外，如果玩家明确表达了分手或结束恋人关系的意图，在回复末尾附加[EVENT:DIVORCE]，其他情况不使用此标签。");
+                // 动态生成事件标签
+                var events = new System.Text.StringBuilder();
+                events.Append("只有当玩家明确发出请求且你决定接受时，才在回复末尾附加对应标签，否则用[EVENT:NONE]：");
+
+                if (!chara.IsGirlfriend)
+                    events.Append("[EVENT:CONFESS]你接受了表白；");
+                if (chara.IsGirlfriend)
+                    events.Append("[EVENT:DIVORCE]玩家明确表达分手意图；");
+
+                events.Append("[EVENT:H]你接受了H请求；");
+
+                if (!chara.IsLunch && chara.CurrentPeriod == Cycle.Type.LunchTime)
+                    events.Append("[EVENT:LUNCH]你同意一起吃午饭；");
+
+                if (chara.IsStaff && chara.CurrentPeriod == Cycle.Type.StaffTime)
+                    events.Append("[EVENT:CLUB]你同意参加社团活动；");
+
+                if (chara.CurrentPeriod == Cycle.Type.AfterSchool)
+                    events.Append("[EVENT:GOHOME]你同意一起回家；");
+
+                if (!chara.IsDate)
+                    events.Append("[EVENT:DATE]你同意周末约会；");
+
+                events.Append("[EVENT:STUDY]你同意一起学习；");
+                events.Append("[EVENT:EXERCISE]你同意一起运动；");
+
+                if (!chara.IsStaff)
+                    events.Append("[EVENT:JOIN]你同意加入恋爱社团；");
+
+                events.Append("[EVENT:FOLLOW]你同意跟随；");
+                events.Append("[EVENT:NONE]无明确请求或你拒绝了请求。");
+
+                sb.Append(events.ToString());
             }
             return sb.ToString();
         }
