@@ -212,7 +212,7 @@ namespace KKAITalk
                         AITalkPlugin.OnReplyReceived = () =>
                         {
                             AITalkPlugin.Log.LogInfo("OnReplyReceived触发，准备调用FinishEventScene");
-                            Invoke("FinishEventScene", 3f);
+                            Invoke("FinishEventScene", 3f);//事件最后阶段等待时间。
                         };
                         AITalkPlugin.Log.LogInfo("OnReplyReceived已赋值");
 
@@ -290,8 +290,8 @@ namespace KKAITalk
             switch (sceneName)
             {
                 case "DiningRoom": return " [system]:[这是午饭的最后一句对话，请用一句话结束这顿饭，表达吃完了或者该离开了。]";
-                case "Study": return " [system]:[这是学习的最后一句对话，请用一句话结束这次学习，表达学完了或者该回去了。]";
-                case "Exercise": return " [system]:[这是运动的最后一句对话，请用一句话结束这次运动，表达运动完了或者该回去了。]";
+                case "Study": return " [system]:[这是学习的最后一句对话，请用一句话结束这次学习，表达学完了或者该离开了。]";
+                case "Exercise": return " [system]:[这是运动的最后一句对话，请用一句话结束这次运动，表达运动完了或者该离开了。]";
                 default: return "";
             }
         }

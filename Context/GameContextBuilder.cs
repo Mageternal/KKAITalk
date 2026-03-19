@@ -60,21 +60,21 @@ namespace KKAITalk.Context
                     sb.Append("你们刚确立恋人关系，还有些羞涩，说话比以前温柔但仍保留一点矜持。");
 
                 if (chara.IsFirstGirlfriend)
-                    sb.Append("这是你的初恋，内心格外珍视这段感情。");
+                    sb.Append("你是玩家的初恋，内心格外珍视这段感情。");
             }
             else
             {
                 // 非恋人状态
                 if (chara.Confessed)
-                    sb.Append("你暗恋着玩家，说话时会不自觉地在意对方，但还没有表白。对于过分的身体接触要求要拒绝。");
+                    sb.Append("你暗恋着玩家，说话时会不自觉地在意对方，但还没有表白。对于过分的身体接触要求一般情况下应拒绝，但依据自己的性格可以变动。");
                 else if (chara.IsStaff)
-                    sb.Append("你是玩家恋爱社团的成员，关系比普通同学更近一些。对于过分的身体接触要求要拒绝。");
+                    sb.Append("你是玩家恋爱社团的成员，关系比普通同学更近一些。对于过分的身体接触要求一般情况下应拒绝，但依据自己的性格可以变动。");
                 else if (chara.Favor >= 80)
-                    sb.Append("你和玩家是非常要好的朋友，说话轻松随意。对于过分的身体接触要求要拒绝。");
+                    sb.Append("你和玩家是非常要好的朋友，说话轻松随意。对于过分的身体接触要求一般情况下应拒绝，但依据自己的性格可以变动。");
                 else if (chara.Favor >= 40)
-                    sb.Append("你和玩家是普通朋友，说话友好但保持距离。对于过分的身体接触要求要拒绝。");
+                    sb.Append("你和玩家是普通朋友，说话友好但保持距离。对于过分的身体接触要求一般情况下应拒绝，但依据自己的性格可以变动。");
                 else
-                    sb.Append("你和玩家几乎不认识，说话礼貌但略显冷淡。对于任何亲密或不雅的要求直接拒绝。");
+                    sb.Append("你和玩家几乎不认识，说话礼貌但略显冷淡。对于任何亲密或不雅的要求一般情况下应拒绝，但依据自己的性格可以变动。");
 
                 // 非恋人状态下的亲密度描述
                 if (chara.Intimacy >= 100)
@@ -93,10 +93,10 @@ namespace KKAITalk.Context
                     sb.Append("你没有H经验。关于性的话题，说话会害羞但不会强硬拒绝。");
                     break;
                 case SaveData.Heroine.HExperienceKind.不慣れ:
-                    sb.Append("你的H经验很少且不熟练。关于性的话题，说话感到有些笨拙且困惑中带着克制的反应。");
+                    sb.Append("你的H经验很少且不熟练。关于性的话题，说话感到有些笨拙且困惑中带着克制的反应，会有点害羞。");
                     break;
                 case SaveData.Heroine.HExperienceKind.慣れ:
-                    sb.Append("你的H经验丰富且熟练。关于性的话题，说话比较冷静地应对，但还不是完全自然，会有点害羞。");
+                    sb.Append("你的H经验丰富且熟练。关于性的话题，说话比较冷静地应对。");
                     break;
                 case SaveData.Heroine.HExperienceKind.淫乱:
                     sb.Append("你的H经验非常丰富且淫乱。关于性的话题，说话积极大胆，表现出淫荡且主动的反应。");
