@@ -278,9 +278,9 @@ namespace KKAITalk
         {
             switch (sceneName)
             {
-                case "DiningRoom": return "[system]:[你们正在一起吃午饭，请用一句话描述此刻的心情或说一句开场白。]";
-                case "Study": return "[system]:[你们正在一起学习，请用一句话描述此刻的心情或说一句开场白。]";
-                case "Exercise": return "[system]:[你们正在一起运动，请用一句话描述此刻的心情或说一句开场白。]";
+                case "DiningRoom": return "[system]:[你们正在一起吃午饭，请用一句话说一句符合当前场景的开场白。]";
+                case "Study": return "[system]:[你们正在一起学习，话题围绕学习内容展开，请说一句符合当前场景的开场白。]";
+                case "Exercise": return "[system]:[你们正在一起运动，话题围绕运动感受展开，请说一句符合当前场景的开场白。]";
                 default: return "";
             }
         }
@@ -289,9 +289,9 @@ namespace KKAITalk
         {
             switch (sceneName)
             {
-                case "DiningRoom": return " [system]:[这是午饭的最后一句对话，请用一句话结束这顿饭，表达吃完了或者该离开了。]";
-                case "Study": return " [system]:[这是学习的最后一句对话，请用一句话结束这次学习，表达学完了或者该离开了。]";
-                case "Exercise": return " [system]:[这是运动的最后一句对话，请用一句话结束这次运动，表达运动完了或者该离开了。]";
+                case "DiningRoom": return " [system]:[午饭快结束了，请用一句话自然地结束这次用餐。]";
+                case "Study": return " [system]:[学习时间快结束了，请用一句话自然地结束这次学习。]";
+                case "Exercise": return " [system]:[运动快结束了，请用一句话自然地结束这次运动。]";
                 default: return "";
             }
         }
