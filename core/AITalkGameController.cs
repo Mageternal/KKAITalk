@@ -116,9 +116,12 @@ namespace KKAITalk
                     // UI和历史记录用cleanReply
                     AIDialogueUI.Instance?.ShowReply(cleanReply);
                     string cleanInput = System.Text.RegularExpressions.Regex.Replace(
-                     playerInput, @"\[system\]:\[.*?\]", "").Trim();
-                    history.Add(new ChatMessage { role = "user", content = cleanInput });
-                    history.Add(new ChatMessage { role = "assistant", content = cleanReply });
+                        playerInput, @"\[situation\]:\[.*?\]", "").Trim();
+                    if (!string.IsNullOrEmpty(cleanInput))
+                    {
+                        history.Add(new ChatMessage { role = "user", content = cleanInput });
+                        history.Add(new ChatMessage { role = "assistant", content = cleanReply });
+                    }
                     MemoryManager.SaveHistory(saveId, _currentChara.CharaId, history);
 
                     AITalkPlugin.OnReplyReceived?.Invoke();
@@ -176,6 +179,7 @@ namespace KKAITalk
             }
             if (reply.Contains("[EVENT:GOHOME]"))
             {
+                AITalkPlugin.Instance._pendingEventScene = "GoHome";
                 AITalkPlugin.Instance.TriggerTalkEvent(talkScene, 6);
                 AITalkPlugin.Log.LogInfo("回家触发");
                 return;

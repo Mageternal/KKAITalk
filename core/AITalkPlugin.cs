@@ -23,9 +23,9 @@ namespace KKAITalk
         internal static AITalkPlugin Instance;
         internal static SaveData.Heroine CurrentHeroine;
         internal static ReplyReceivedDelegate OnReplyReceived;
+        internal string _pendingEventScene = "";
         private TalkScene _pendingTalkScene;
         private int _pendingEventIndex;
-        private string _pendingEventScene = "";
         private bool _isFirstEventInput = false;
         private string _sceneBeforeTalk = "";
         public delegate void ReplyReceivedDelegate();
@@ -152,9 +152,8 @@ namespace KKAITalk
 
             if (scene.name == "Talk")
             {
-                _talkSceneWasLoaded = true;
-                _sceneBeforeTalk = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-                Invoke("OnTalkSceneReady", 0.1f);
+                AIDialogueUI.Instance?.Hide();
+                _talkSceneWasLoaded = false;
             }
             //吃饭场景
             if (scene.name == "DiningRoom")
@@ -274,6 +273,7 @@ namespace KKAITalk
                 };
                 AITalkPlugin.Log.LogInfo("事件场景输入事件订阅完成");
 
+                _isFirstEventInput = false; // 先重置，防止上一个场景的残留状态
                 string autoInput = GetAutoInput(_pendingEventScene);
                 if (!string.IsNullOrEmpty(autoInput))
                 {
