@@ -223,10 +223,14 @@ namespace KKAITalk
 
         protected override void OnStartH(HSceneProc hSceneProc, bool freeH)
         {
+            AITalkPlugin.Log.LogInfo("H场景开始");
+            AITalkPlugin.Instance.OnHSceneStart(hSceneProc);
         }
 
         protected override void OnEndH(HSceneProc hSceneProc, bool freeH)
         {
+            AITalkPlugin.Log.LogInfo("H场景结束");
+            AITalkPlugin.Instance.OnHSceneEnd();
         }
 
 

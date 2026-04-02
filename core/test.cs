@@ -6,6 +6,7 @@ using UnityEngine;
 using static SaveData;
 using static Studio.Info.LightLoadInfo;
 using System.Collections;
+using System.Reflection;
 
 namespace KKAITalk
 {
@@ -19,19 +20,124 @@ namespace KKAITalk
             if (Input.GetKeyDown(KeyCode.F9))
                 DumpHeroineStatus();
         }
+
         private void RunTest()
         {
-            // 尝试关闭字幕
-            var allObjects = Resources.FindObjectsOfTypeAll<GameObject>();
-            foreach (var obj in allObjects)
+            var hProc = FindObjectOfType<HSceneProc>();
+            if (hProc == null)
             {
-                if (obj.name == "KK_Subtitles_Caption")
+                AITalkPlugin.Log.LogWarning("不在H场景");
+                return;
+            }
+
+            AITalkPlugin.Log.LogInfo("找到HSceneProc");
+
+            // 找HFlag - 使用安全反射方法
+            var flags = SafeGetFieldValue(hProc, "flags");
+            if (flags == null)
+            {
+                AITalkPlugin.Log.LogWarning("flags字段未找到，尝试搜索所有字段");
+                var allFields = SafeGetAllFields(hProc.GetType());
+                foreach (var f in allFields)
                 {
-                    obj.SetActive(false);
-                    AITalkPlugin.Log.LogInfo($"关闭字幕: {obj.name}");
+                    AITalkPlugin.Log.LogInfo($"  字段: {f.Name} = {f.FieldType}");
                 }
+                return;
+            }
+
+            AITalkPlugin.Log.LogInfo($"flags类型: {flags.GetType().FullName}");
+
+            // 读取关键字段
+            string[] targets = { "gaugeMale", "gaugeFemale", "speed", "nowAnimStateName", "isAnalPlay" };
+            foreach (var name in targets)
+            {
+                // 使用安全的反射查找
+                var value = SafeGetFieldOrPropertyValue(flags, name);
+                if (value != null)
+                    AITalkPlugin.Log.LogInfo($"  {name} = {value}");
+                else
+                    AITalkPlugin.Log.LogWarning($"  {name} 未找到");
             }
         }
+
+        /// <summary>
+        /// 安全获取字段值 - 避免 op_Equality 问题
+        /// </summary>
+        private static object SafeGetFieldValue(object obj, string fieldName)
+        {
+            if (obj == null) return null;
+
+            try
+            {
+                var type = obj.GetType();
+                var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
+                foreach (var f in fields)
+                {
+                    if (f.Name == fieldName)
+                        return f.GetValue(obj);
+                }
+                return null;
+            }
+            catch (MissingMethodException ex)
+            {
+                AITalkPlugin.Log.LogWarning($"SafeGetFieldValue: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 安全获取所有字段 - 避免 op_Equality 问题
+        /// </summary>
+        private static FieldInfo[] SafeGetAllFields(Type type)
+        {
+            try
+            {
+                return type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            }
+            catch (MissingMethodException ex)
+            {
+                AITalkPlugin.Log.LogWarning($"SafeGetAllFields: {ex.Message}");
+                return new FieldInfo[0];
+            }
+        }
+
+        /// <summary>
+        /// 安全获取字段或属性值 - 避免 op_Equality 问题
+        /// </summary>
+        private static object SafeGetFieldOrPropertyValue(object obj, string name)
+        {
+            if (obj == null) return null;
+
+            try
+            {
+                var type = obj.GetType();
+
+                // 先尝试属性
+                var properties = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                foreach (var p in properties)
+                {
+                    if (p.Name == name)
+                        return p.GetValue(obj, null);
+                }
+
+                // 再尝试字段
+                var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                foreach (var f in fields)
+                {
+                    if (f.Name == name)
+                        return f.GetValue(obj);
+                }
+
+                return null;
+            }
+            catch (MissingMethodException ex)
+            {
+                AITalkPlugin.Log.LogWarning($"SafeGetFieldOrPropertyValue({name}): {ex.Message}");
+                return null;
+            }
+        }
+
         private void DumpHeroineStatus()
         {
             var saveData = Manager.Game.Instance?.saveData;
@@ -39,31 +145,19 @@ namespace KKAITalk
 
             var testHeroine = saveData.heroineList[0];
 
-            // 加在这里
             var talkScene = FindObjectOfType<TalkScene>();
             if (talkScene != null && talkScene.targetHeroine != null)
             {
                 var heroine = talkScene.targetHeroine;
-                var relationProp = heroine.GetType().GetProperty("relation",
-                    System.Reflection.BindingFlags.Public |
-                    System.Reflection.BindingFlags.NonPublic |
-                    System.Reflection.BindingFlags.Instance);
-                try
-                {
-                    AITalkPlugin.Log.LogInfo($"TalkScene heroine relation = {relationProp.GetValue(heroine, null)}");
-                }
-                catch
-                {
-                    AITalkPlugin.Log.LogWarning("relation读取失败");
-                }
+                var relationValue = SafeGetFieldOrPropertyValue(heroine, "relation");
+                AITalkPlugin.Log.LogInfo($"TalkScene heroine relation = {relationValue}");
             }
         }
+
         private void Start()
         {
-            // 监听Maker里角色被替换/重载的事件
             MakerAPI.MakerFinishedLoading += (s, e) => DumpCurrentMakerChara();
 
-            // 这个事件在Maker里加载新角色卡时触发
             KKAPI.Chara.CharacterApi.CharacterReloaded += (s, e) =>
             {
                 if (!MakerAPI.InsideMaker) return;
@@ -80,21 +174,18 @@ namespace KKAITalk
 
             AITalkPlugin.Log.LogInfo($"当前角色: {chaCtrl.fileParam.fullname}");
 
-            // 直接读ChaFile原生字段
             var param = chaCtrl.chaFile.parameter;
             AITalkPlugin.Log.LogInfo($"  nickname: {param.nickname}");
             AITalkPlugin.Log.LogInfo($"  sex: {param.sex}");
 
-            // 用反射列出parameter所有字段
-            var fields = param.GetType().GetFields(
-                System.Reflection.BindingFlags.Public |
-                System.Reflection.BindingFlags.Instance);
+            var fields = SafeGetAllFields(param.GetType());
             foreach (var f in fields)
             {
                 try { AITalkPlugin.Log.LogInfo($"  field: {f.Name} = {f.GetValue(param)}"); }
                 catch { }
             }
         }
+
         private void DumpEventButtons()
         {
             StartCoroutine(AutoClickEvent(1));
@@ -107,24 +198,16 @@ namespace KKAITalk
 
             var type = talkScene.GetType();
 
-            // 先点击buttonEvent展开列表
-            var btnEventField = type.GetField("buttonEvent",
-                System.Reflection.BindingFlags.NonPublic |
-                System.Reflection.BindingFlags.Instance);
-            var btnEvent = btnEventField.GetValue(talkScene) as UnityEngine.UI.Button;
-            if (btnEvent != null)
+            var btnEventField = SafeGetFieldValue(talkScene, "buttonEvent") as UnityEngine.UI.Button;
+            if (btnEventField != null)
             {
-                btnEvent.onClick.Invoke();
+                btnEventField.onClick.Invoke();
                 AITalkPlugin.Log.LogInfo("展开Event列表");
             }
 
             yield return new WaitForSeconds(0.3f);
 
-            // 点击指定索引的按钮
-            var field = type.GetField("buttonEventContents",
-                System.Reflection.BindingFlags.NonPublic |
-                System.Reflection.BindingFlags.Instance);
-            var buttons = field.GetValue(talkScene) as UnityEngine.UI.Button[];
+            var buttons = SafeGetFieldValue(talkScene, "buttonEventContents") as UnityEngine.UI.Button[];
             if (buttons == null || index >= buttons.Length) yield break;
 
             if (buttons[index] != null && buttons[index].gameObject.activeInHierarchy)
@@ -136,21 +219,27 @@ namespace KKAITalk
                 AITalkPlugin.Log.LogWarning($"按钮{index}未激活");
         }
 
-
         private void DumpExtData(ChaFile chaFile)
         {
-            var allData = ExtendedSave.GetAllExtendedData(chaFile);
-            if (allData == null || allData.Count == 0)
+            try
             {
-                AITalkPlugin.Log.LogWarning("  无扩展数据");
-                return;
-            }
+                var allData = ExtendedSave.GetAllExtendedData(chaFile);
+                if (allData == null || allData.Count == 0)
+                {
+                    AITalkPlugin.Log.LogWarning("  无扩展数据");
+                    return;
+                }
 
-            foreach (var guid in allData.Keys)
+                foreach (var guid in allData.Keys)
+                {
+                    AITalkPlugin.Log.LogInfo($"  GUID: {guid}");
+                    foreach (var kv in allData[guid].data)
+                        AITalkPlugin.Log.LogInfo($"    key={kv.Key}, value={kv.Value}");
+                }
+            }
+            catch (MissingMethodException ex)
             {
-                AITalkPlugin.Log.LogInfo($"  GUID: {guid}");
-                foreach (var kv in allData[guid].data)
-                    AITalkPlugin.Log.LogInfo($"    key={kv.Key}, value={kv.Value}");
+                AITalkPlugin.Log.LogWarning($"DumpExtData: {ex.Message}");
             }
         }
     }

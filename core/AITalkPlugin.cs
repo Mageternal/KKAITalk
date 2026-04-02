@@ -1,12 +1,13 @@
 ﻿using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
-using KKAITalk.Context;
 using KKAITalk;
+using KKAITalk.Context;
 using KKAITalk.LLM;
 using KKAITalk.UI;
 using KKAPI.MainGame;
 using System;
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -31,6 +32,9 @@ namespace KKAITalk
         public delegate void ReplyReceivedDelegate();
         private bool _talkSceneWasLoaded = false;
         private bool _eventTriggered = false;
+        private HSceneProc _hSceneProc;
+        private object _hFlags;
+        private string _lastAnimState = "";
 
 
 
@@ -510,6 +514,116 @@ namespace KKAITalk
         {
             // Unity 5.x 没有Input.SimulateTouch，用Input模拟不了
             // 需要找到按钮的Button组件直接调用onClick
+        }
+        private static object SafeGetFieldValue(object obj, string fieldName)
+        {
+            if (obj == null) return null;
+
+            try
+            {
+                var type = obj.GetType();
+                var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
+                foreach (var f in fields)
+                {
+                    if (f.Name == fieldName)
+                        return f.GetValue(obj);
+                }
+                return null;
+            }
+            catch (MissingMethodException ex)
+            {
+                AITalkPlugin.Log.LogWarning($"SafeGetFieldValue: {ex.Message}");
+                return null;
+            }
+        }
+        private static object SafeGetFieldOrPropertyValue(object obj, string name)
+        {
+            if (obj == null) return null;
+
+            try
+            {
+                var type = obj.GetType();
+
+                // 先尝试属性
+                var properties = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                foreach (var p in properties)
+                {
+                    if (p.Name == name)
+                        return p.GetValue(obj, null);
+                }
+
+                // 再尝试字段
+                var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                foreach (var f in fields)
+                {
+                    if (f.Name == name)
+                        return f.GetValue(obj);
+                }
+
+                return null;
+            }
+            catch (MissingMethodException ex)
+            {
+                AITalkPlugin.Log.LogWarning($"SafeGetFieldOrPropertyValue({name}): {ex.Message}");
+                return null;
+            }
+        }
+        public void OnHSceneStart(HSceneProc hSceneProc)
+        {
+            _hSceneProc = hSceneProc;
+            _hFlags = SafeGetFieldValue(hSceneProc, "flags");
+            _lastAnimState = "";
+
+            CloseSubtitles();
+
+            // 显示AI对话框
+            if (CurrentHeroine != null)
+                AIDialogueUI.Instance?.ShowInputMode(CurrentHeroine.Name ?? "");
+
+            // 启动状态监听
+            InvokeRepeating("MonitorHScene", 1f, 0.5f);
+            AITalkPlugin.Log.LogInfo("H场景AI模式开启");
+        }
+
+        public void OnHSceneEnd()
+        {
+            CancelInvoke("MonitorHScene");
+            AIDialogueUI.Instance?.Hide();
+            _hSceneProc = null;
+            _hFlags = null;
+            AITalkPlugin.Log.LogInfo("H场景AI模式关闭");
+        }
+
+        private void MonitorHScene()
+        {
+            if (_hFlags == null) return;
+
+            string animState = SafeGetFieldOrPropertyValue(_hFlags, "nowAnimStateName")?.ToString() ?? "";
+            if (animState == _lastAnimState) return;
+
+            AITalkPlugin.Log.LogInfo($"动作状态变化: {_lastAnimState} -> {animState}");
+            _lastAnimState = animState;
+
+            // 根据状态触发主动发言
+            string autoInput = GetHAutoInput(animState);
+            if (!string.IsNullOrEmpty(autoInput) && CurrentHeroine != null)
+            {
+                var controller = FindObjectOfType<AITalkGameController>();
+                if (controller != null)
+                    controller.OnTalkStart(CurrentHeroine, autoInput);
+            }
+        }
+
+        private string GetHAutoInput(string animState)
+        {
+            if (animState.Contains("Idle") && !animState.Contains("Insert"))
+                return "[system]:[H场景，待插入状态，用符合角色性格的话说一句话。]";
+            if (animState == "Insert")
+                return "[system]:[H场景，刚插入的瞬间，用符合角色性格的话说一句话。]";
+            if (animState.Contains("IN_A"))
+                return "[system]:[H场景，高潮结束后，用符合角色性格的话说一句话。]";
+            return "";
         }
     }
 }
