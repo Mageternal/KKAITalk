@@ -289,7 +289,11 @@ namespace KKAITalk.UI
             if (_panel != null) _panel.SetActive(false);
             if (_inputPanel != null) _inputPanel.SetActive(false); // 加这行
         }
-
+        public void SetPanelHeight(float height)
+        {
+            var panelRect = _panel.GetComponent<RectTransform>();
+            panelRect.offsetMax = new Vector2(-10f, height);
+        }
         // ── 协程 ─────────────────────────────────────────────────
 
         // 等待时显示滚动省略号动画

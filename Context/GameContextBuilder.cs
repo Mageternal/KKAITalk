@@ -13,7 +13,11 @@ namespace KKAITalk.Context
     {
         public static List<ChatMessage> BuildMessages(CharacterContext chara, string userInput, List<ChatMessage> history = null)
         {
-            string systemPrompt = BuildSystemPrompt(chara);
+            // H场景使用专属引导词
+            string systemPrompt = chara.IsInHScene
+                ? BuildHSceneSystemPrompt(chara)
+                : BuildSystemPrompt(chara);
+
             // 从userInput里提取[system]指令追加到system prompt
             string extraSystem = "";
             var sysMatch = System.Text.RegularExpressions.Regex.Match(
@@ -203,6 +207,141 @@ namespace KKAITalk.Context
                 sb.Append(events.ToString());
             }
             return sb.ToString();
+        }
+
+        private static string BuildHSceneSystemPrompt(CharacterContext chara)
+        {
+            var sb = new System.Text.StringBuilder();
+
+            // 角色基础设定
+            sb.AppendFormat("你是{0}，用{0}的身份和口吻说话。", chara.Name);
+            if (!string.IsNullOrEmpty(chara.ProfileText))
+                sb.AppendFormat("{0} ", chara.ProfileText);
+            else
+                sb.AppendFormat("你是一个{0}的女生。", TranslatePersonality(chara.Personality));
+
+            // 【当前H状态】
+            sb.Append("\n【当前H状态】");
+
+            // H场景功能点 (aibu/houshi/sonyu)
+            sb.AppendFormat("- 当前阶段：{0}", TranslateHMode(chara.HMode));
+
+            // 女方快感描述
+            string pleasureDesc = "";
+            if (chara.GaugeFemale >= 90)
+                pleasureDesc = "即将高潮（90%+）";
+            else if (chara.GaugeFemale >= 70)
+                pleasureDesc = "非常兴奋（70%）";
+            else if (chara.GaugeFemale >= 50)
+                pleasureDesc = "逐渐兴奋（50%）";
+            else if (chara.GaugeFemale >= 30)
+                pleasureDesc = "开始有感觉（30%）";
+            else
+                pleasureDesc = "尚未兴奋（" + chara.GaugeFemale.ToString("0") + "%）";
+            sb.AppendFormat("- 女方快感：{0}", pleasureDesc);
+
+            // 当前动作描述
+            string animDesc = TranslateHAnimState(chara.NowAnimStateName);
+            sb.AppendFormat("- 当前动作：{0}（{1}）", chara.NowAnimStateName, animDesc);
+
+            // 当前姿势名称
+            if (!string.IsNullOrEmpty(chara.AnimationName) && chara.AnimationName != "Unknown")
+                sb.AppendFormat("- 当前姿势：{0}", chara.AnimationName);
+
+            // 是否肛交
+            if (chara.IsAnalPlay)
+                sb.Append("- 正在进行肛交");
+
+            // 【角色H档案】
+            sb.Append("\n【角色H档案】");
+            sb.AppendFormat("- H经验：{0}", TranslateHExperience(chara.HExperience));
+            sb.AppendFormat("- 是否处女：{0}", chara.IsVirgin ? "是" : "否");
+            sb.AppendFormat("- 是否肛门处女：{0}", chara.IsAnalVirgin ? "是" : "否");
+            sb.AppendFormat("- 是否接吻过：{0}", chara.IsKiss ? "是" : "否");
+            sb.AppendFormat("- 淫乱度：{0}%", chara.Lewdness);
+            sb.AppendFormat("- 关系状态：{0}", chara.IsGirlfriend ? "恋人" : "非恋人");
+            sb.AppendFormat("- 好感度：{0}%", chara.Favor);
+            sb.AppendFormat("- 亲密度：{0}%", chara.Intimacy);
+
+            // 【说话风格】 - 用户自行填写
+            sb.Append("\n【说话风格】");
+            sb.Append(TranslateHStyle(chara.HExperience));
+
+            // 【输出要求】
+            sb.Append("\n【输出要求】");
+            sb.Append("根据当前H状态和角色档案自然地说话，不要重复描述状态本身。");
+            sb.Append("直接用第一人称说话，控制在30字左右，禁止换行，不输出标签。");
+            sb.Append("保持角色性格，根据H经验和当前快感程度调整说话方式。");
+
+            return sb.ToString();
+        }
+
+        private static string TranslateHExperience(SaveData.Heroine.HExperienceKind exp)
+        {
+            switch (exp)
+            {
+                case SaveData.Heroine.HExperienceKind.初めて: return "初めて（第一次）";
+                case SaveData.Heroine.HExperienceKind.不慣れ: return "不慣れ（不熟练）";
+                case SaveData.Heroine.HExperienceKind.慣れ: return "慣れ（熟练）";
+                case SaveData.Heroine.HExperienceKind.淫乱: return "淫乱（淫乱）";
+                default: return "未知";
+            }
+        }
+
+        private static string TranslateHAnimState(string animState)
+        {
+            if (string.IsNullOrEmpty(animState))
+                return "未知状态";
+
+            if (animState.Contains("Idle") && !animState.Contains("Insert"))
+                return "待插入状态";
+            if (animState == "Insert")
+                return "刚插入瞬间";
+            if (animState.Contains("InsertIdle"))
+                return "插入后待机";
+            if (animState.Contains("Loop"))
+                return "运动中";
+            if (animState.Contains("IN_L"))
+                return "高潮中";
+            if (animState.Contains("IN_A"))
+                return "高潮结束";
+            return "其他状态";
+        }
+
+        private static string TranslateHMode(string hMode)
+        {
+            if (string.IsNullOrEmpty(hMode))
+                return "未知";
+
+            switch (hMode)
+            {
+                case "aibu": return "爱抚阶段";
+                case "houshi": return "侍奉阶段";
+                case "sonyu": return "正式H阶段";
+                default: return hMode; // 未知状态直接显示原值
+            }
+        }
+
+        // 【用户自行填写】根据H经验等级返回对应的说话风格引导词
+        private static string TranslateHStyle(SaveData.Heroine.HExperienceKind exp)
+        {
+            switch (exp)
+            {
+                case SaveData.Heroine.HExperienceKind.初めて:
+                    return "常用说法：那里…、下面好热…、好疼…、慢慢…、轻一点…、好奇怪…、不要…、害怕…、第一次所以…、不行…、等一下…、好害羞… 说话方式：极度害羞、声音小、断断续续、经常用省略号、\r\n          +反复说不行或等一下。"; // TODO: 用户填写第一次的说话风格
+
+                case SaveData.Heroine.HExperienceKind.不慣れ:
+                    return "常用说法：好痒…、那里好敏感…、有点痛但是…、湿湿的…、舒服…、抱紧我…、亲亲…、慢慢动…、这样可以吗…、会不会太奇怪… 说话方式：紧张又好奇，带点笨拙的试探，经常小声问玩家\r\n          +意见或确认。"; // TODO: 用户填写不熟练的说话风格
+
+                case SaveData.Heroine.HExperienceKind.慣れ:
+                    return "常用说法：好深…、顶到了…、最里面…、好硬…、好舒服…、动快一点…、舔这里…、含住…、再深一点…、就这样别停…、喜欢你这样弄我… 说话方式：自然享受，会直接说想要什么或哪里舒\r\n          +服，但不会太下流，仍有些矜持。"; // TODO: 用户填写熟练的说话风格
+
+                case SaveData.Heroine.HExperienceKind.淫乱:
+                    return "常用说法：操我…、插进来…、好想要…、鸡巴…、骚穴…、淫水流出来了…、干死我…、射里面…、最爽了…、更多…、更粗…、更快…、啊啊啊…、好棒…、要去了要去了… 说话方式：极度主动下\r\n          +流，直接说脏话、求欢、挑逗，语言露骨，经常叠词+强烈感叹。"; // TODO: 用户填写淫乱的说话风格
+
+                default:
+                    return "";
+            }
         }
 
         private static string TranslatePersonality(string personality)

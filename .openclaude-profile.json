@@ -1,0 +1,9 @@
+{
+  "profile": "openai",
+  "env": {
+    "OPENAI_BASE_URL": "https://proxy.pieixan.icu/v1/responses",
+    "OPENAI_MODEL": "gpt-5.3-codex-spark",
+    "OPENAI_API_FORMAT": "chat_completions"
+  },
+  "createdAt": "2026-04-28T07:51:04.733Z"
+}

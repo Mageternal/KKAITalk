@@ -4,6 +4,7 @@ using BepInEx.Logging;
 using KKAITalk;
 using KKAITalk.Context;
 using KKAITalk.LLM;
+using KKAITalk.Memory;
 using KKAITalk.UI;
 using KKAPI.MainGame;
 using System;
@@ -264,6 +265,7 @@ namespace KKAITalk
             string charaName = CurrentHeroine.Name ?? "";
 
             AIDialogueUI.Instance?.ShowInputMode(charaName);
+            AIDialogueUI.Instance?.SetPanelHeight(200f); // 恢复默认对话框高度
             AITalkPlugin.Log.LogInfo("事件场景AI模式开启");
 
             var heroine = CurrentHeroine;
@@ -466,6 +468,7 @@ namespace KKAITalk
             
             string charaName = talkScene.targetHeroine?.Name ?? "";
             AIDialogueUI.Instance?.ShowInputMode(charaName);
+            AIDialogueUI.Instance?.SetPanelHeight(200f); // 恢复默认对话框高度
             AITalkPlugin.Log.LogInfo("AI模式自动开启");
             
             var controller = FindObjectOfType<AITalkGameController>();
@@ -579,7 +582,20 @@ namespace KKAITalk
 
             // 显示AI对话框
             if (CurrentHeroine != null)
+            {
                 AIDialogueUI.Instance?.ShowInputMode(CurrentHeroine.Name ?? "");
+                AIDialogueUI.Instance?.SetPanelHeight(120f); // H场景使用较小的对话框
+            }
+
+            // 订阅玩家输入事件
+            if (CurrentHeroine != null)
+            {
+                AIDialogueUI.Instance.OnUserInput = (input) =>
+                {
+                    TriggerHSceneTalk(CurrentHeroine, input);
+                };
+                AITalkPlugin.Log.LogInfo("H场景输入事件订阅完成");
+            }
 
             // 启动状态监听
             InvokeRepeating("MonitorHScene", 1f, 0.5f);
@@ -609,10 +625,85 @@ namespace KKAITalk
             string autoInput = GetHAutoInput(animState);
             if (!string.IsNullOrEmpty(autoInput) && CurrentHeroine != null)
             {
-                var controller = FindObjectOfType<AITalkGameController>();
-                if (controller != null)
-                    controller.OnTalkStart(CurrentHeroine, autoInput);
+                TriggerHSceneTalk(CurrentHeroine, autoInput);
             }
+        }
+
+        private void TriggerHSceneTalk(SaveData.Heroine heroine, string playerInput)
+        {
+            if (heroine == null) return;
+
+            // 构建H场景的CharacterContext
+            var chara = CharacterDataReader.ReadFromHeroine(heroine);
+            if (chara == null) return;
+
+            // 读取H场景动态数据
+            chara.IsInHScene = true;
+            chara.NowAnimStateName = _lastAnimState;
+            chara.IsAnalPlay = (bool?)SafeGetFieldOrPropertyValue(_hFlags, "isAnalPlay") ?? false;
+
+            var gaugeFemale = SafeGetFieldOrPropertyValue(_hFlags, "gaugeFemale");
+            if (gaugeFemale != null && gaugeFemale is float)
+                chara.GaugeFemale = (float)gaugeFemale;
+            else
+                chara.GaugeFemale = 0f;
+
+            // 读取H场景功能点状态 (aibu/houshi/sonyu)
+            var emode = SafeGetFieldOrPropertyValue(_hFlags, "nowMode");
+            if (emode != null)
+                chara.HMode = emode.ToString();
+            else
+                chara.HMode = "Unknown";
+
+            // 读取当前姿势名称 (nowAnimationInfo.nameAnimation)
+            var nowAnimInfo = SafeGetFieldOrPropertyValue(_hFlags, "nowAnimationInfo");
+            if (nowAnimInfo != null)
+            {
+                var animName = SafeGetFieldOrPropertyValue(nowAnimInfo, "nameAnimation");
+                if (animName != null)
+                    chara.AnimationName = animName.ToString();
+                else
+                    chara.AnimationName = "Unknown";
+            }
+            else
+                chara.AnimationName = "Unknown";
+
+            AITalkPlugin.Log.LogInfo($"H场景数据: GaugeFemale={chara.GaugeFemale}%, AnimState={chara.NowAnimStateName}, Animation={chara.AnimationName}, IsAnalPlay={chara.IsAnalPlay}, HMode={chara.HMode}");
+
+            AIDialogueUI.Instance?.ShowWaiting(chara.Name);
+
+            // 读取记忆
+            string saveId = MemoryManager.GetSaveId();
+            var history = MemoryManager.LoadHistory(saveId, chara.CharaId);
+
+            // 使用H场景引导词构建消息
+            var messages = GameContextBuilder.BuildMessages(chara, playerInput, history);
+
+            AITalkPlugin.Client.SendMessage(
+                messages,
+                reply =>
+                {
+                    AITalkPlugin.Log.LogInfo($"[H场景回复] {reply}");
+
+                    // 清理标签（H场景不需要标签，但以防万一）
+                    string cleanReply = System.Text.RegularExpressions.Regex.Replace(
+                        reply, @"\[APOLOGY:[^\]]+\]|\[FAVOR:[^\]]+\]|\[INTIMACY:[^\]]+\]|\[LEWD:[^\]]+\]|\[EVENT:[^\]]+\]", "").Trim();
+                    cleanReply = cleanReply.Replace("\n", "").Replace("\r", "");
+
+                    AIDialogueUI.Instance?.ShowReply(cleanReply);
+
+                    // 保存历史记录
+                    string cleanInput = System.Text.RegularExpressions.Regex.Replace(
+                        playerInput, @"\[situation\]:\[.*?\]", "").Trim();
+                    if (!string.IsNullOrEmpty(cleanInput))
+                    {
+                        history.Add(new ChatMessage { role = "user", content = cleanInput });
+                        history.Add(new ChatMessage { role = "assistant", content = cleanReply });
+                    }
+                    MemoryManager.SaveHistory(saveId, chara.CharaId, history);
+                },
+                err => AITalkPlugin.Log.LogError("H场景请求失败: " + err)
+            );
         }
 
         private string GetHAutoInput(string animState)

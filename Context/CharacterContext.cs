@@ -39,5 +39,13 @@ namespace KKAITalk.Context
         public bool IsKiss;
         public SaveData.Heroine.HExperienceKind HExperience;
 
+        // H场景动态状态
+        public float GaugeFemale;
+        public string NowAnimStateName;
+        public string AnimationName; // 当前姿势名称
+        public bool IsAnalPlay;
+        public bool IsInHScene;
+        public string HMode; // aibu/houshi/sonyu
+
     }
 }
