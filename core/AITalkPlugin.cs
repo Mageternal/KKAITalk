@@ -585,6 +585,9 @@ namespace KKAITalk
             {
                 AIDialogueUI.Instance?.ShowInputMode(CurrentHeroine.Name ?? "");
                 AIDialogueUI.Instance?.SetPanelHeight(120f); // H场景使用较小的对话框
+
+                // 触发开场白（根据EMode决定）
+                Invoke("TriggerHSceneIntro", 0.5f);
             }
 
             // 订阅玩家输入事件
@@ -611,6 +614,10 @@ namespace KKAITalk
             AITalkPlugin.Log.LogInfo("H场景AI模式关闭");
         }
 
+        private string _pendingHAction = ""; // 记录待触发AI的动作类型
+        private bool _isASeries = false; // 是否是A系列（A_Idle后还需要Idle再触发一次）
+        private bool _isSSeries = false; // 是否是S系列（S_Idle后还需要Idle再触发一次）
+
         private void MonitorHScene()
         {
             if (_hFlags == null) return;
@@ -619,14 +626,200 @@ namespace KKAITalk
             if (animState == _lastAnimState) return;
 
             AITalkPlugin.Log.LogInfo($"动作状态变化: {_lastAnimState} -> {animState}");
-            _lastAnimState = animState;
 
-            // 根据状态触发主动发言
-            string autoInput = GetHAutoInput(animState);
-            if (!string.IsNullOrEmpty(autoInput) && CurrentHeroine != null)
+            // 读取当前EMode
+            var emode = SafeGetFieldOrPropertyValue(_hFlags, "mode");
+            string currentMode = emode?.ToString() ?? "";
+
+            // houshi 模式单独处理
+            if (currentMode == "houshi")
             {
-                TriggerHSceneTalk(CurrentHeroine, autoInput);
+                HandleHoushiMode(animState);
             }
+            // aibu/sonyu 模式
+            else
+            {
+                HandleNormalMode(animState);
+            }
+
+            _lastAnimState = animState;
+        }
+
+        private void HandleHoushiMode(string animState)
+        {
+            AITalkPlugin.Log.LogInfo($"houshi模式: {animState}");
+
+            // WLoop、SLoop：平缓发言（立即触发）
+            if (animState == "WLoop" || animState == "SLoop")
+            {
+                if (CurrentHeroine != null)
+                {
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("houshi_calm"));
+                }
+            }
+            // OLoop：激烈发言（立即触发）
+            else if (animState == "OLoop")
+            {
+                if (CurrentHeroine != null)
+                {
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("houshi_intense"));
+                }
+            }
+            // Vomit_A：呕吐结束（立即触发）
+            else if (animState == "Vomit_A")
+            {
+                if (CurrentHeroine != null)
+                {
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("Vomit"));
+                }
+            }
+            // Drink_A：吞精结束（立即触发）
+            else if (animState == "Drink_A")
+            {
+                if (CurrentHeroine != null)
+                {
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("Drink"));
+                }
+            }
+            // OUT_A：射精结束（立即触发）
+            else if (animState == "OUT_A")
+            {
+                if (CurrentHeroine != null)
+                {
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("OUT"));
+                }
+            }
+        }
+
+        private void HandleNormalMode(string animState)
+        {
+            // M系列：M_Idle -> 立即触发
+            if (animState == "M_Idle")
+            {
+                AITalkPlugin.Log.LogInfo("M系列触发");
+                if (CurrentHeroine != null)
+                {
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("M"));
+                }
+                _pendingHAction = "";
+                _isASeries = false;
+                _isSSeries = false;
+            }
+            // A系列：A_Idle -> 立即触发
+            else if (animState == "A_Idle")
+            {
+                AITalkPlugin.Log.LogInfo("A系列触发");
+                if (CurrentHeroine != null)
+                {
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("A_start"));
+                }
+                _pendingHAction = "A";
+                _isASeries = true;
+                _isSSeries = false;
+            }
+            // S系列：S_Idle -> 立即触发
+            else if (animState == "S_Idle")
+            {
+                AITalkPlugin.Log.LogInfo("S系列触发");
+                if (CurrentHeroine != null)
+                {
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("S_start"));
+                }
+                _pendingHAction = "S";
+                _isASeries = false;
+                _isSSeries = true;
+            }
+            // K系列：K_Loop -> 等待Idle触发
+            else if (animState.Contains("_Loop"))
+            {
+                string prefix = animState.Split('_')[0];
+                _pendingHAction = prefix;
+                _isASeries = false;
+                _isSSeries = false;
+                AITalkPlugin.Log.LogInfo($"Loop检测: {prefix}，等待Idle触发");
+            }
+            // Idle状态时触发
+            else if (animState == "Idle")
+            {
+                if (!string.IsNullOrEmpty(_pendingHAction))
+                {
+                    string action = _pendingHAction;
+                    string autoInput = GetHLoopCompletedInput(action);
+                    if (!string.IsNullOrEmpty(autoInput) && CurrentHeroine != null)
+                    {
+                        TriggerHSceneTalk(CurrentHeroine, autoInput);
+                    }
+                }
+                // A系列在最后Idle再触发一次
+                if (_isASeries && CurrentHeroine != null)
+                {
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("A_stop"));
+                }
+                // S系列在最后Idle再触发一次
+                if (_isSSeries && CurrentHeroine != null)
+                {
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("S_stop"));
+                }
+                // 重置状态
+                _pendingHAction = "";
+                _isASeries = false;
+                _isSSeries = false;
+            }
+            // Orgasm高潮：Orgasm_A -> 立即触发
+            else if (animState == "Orgasm_A")
+            {
+                AITalkPlugin.Log.LogInfo("Orgasm高潮触发");
+                if (CurrentHeroine != null)
+                {
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("Orgasm"));
+                }
+                _pendingHAction = "";
+                _isASeries = false;
+                _isSSeries = false;
+            }
+        }
+
+        private string GetHLoopCompletedInput(string actionType)
+        {
+            switch (actionType)
+            {
+                case "K": return "刚才完成了接吻，用符合角色性格与情形的话说一句话。"; // TODO: K_Loop 后的 Idle
+                case "M": return "开始被上身爱抚，用符合角色性格与情形的话说一句话。"; // TODO: M_Idle
+                case "A_start": return "开始被下身爱抚，用符合角色性格与情形的话说一句话。"; // TODO: A_Idle
+                case "A_stop": return "刚才完成了下身爱抚，用符合角色性格与情形的话说一句话。"; // TODO: A_Idle 后的 Idle
+                case "S_start": return "开始被打屁股，用符合角色性格与情形的话说一句话。"; // TODO: S_Idle
+                case "S_stop": return "刚才完成了打屁股，用符合角色性格与情形的话说一句话。"; // TODO: S_Idle 后的 Idle
+                case "Orgasm": return "你刚刚高潮完了，用符合角色性格与情形的话说一句话。"; // TODO: Orgasm_A
+
+                // houshi 模式
+                case "houshi_calm": return "你在温柔按摩男主，用符合角色性格与情形的话说一句话。"; // TODO: WLoop/SLoop
+                case "houshi_intense": return "你在激烈按摩男主，用符合角色性格与情形的话说一句话。"; // TODO: OLoop
+                case "Vomit": return "你把牛奶吐出了，用符合角色性格与情形的话说一句话。"; // TODO: Vomit_A
+                case "Drink": return "你把牛奶喝了，用符合角色性格与情形的话说一句话。"; // TODO: Drink_A
+                case "OUT": return "男主在你面前撒水，用符合角色性格与情形的话说一句话。"; // TODO: OUT_A
+
+                default: return "";
+            }
+        }
+
+        private void TriggerHSceneIntro()
+        {
+            if (CurrentHeroine == null) return;
+
+            var emode = SafeGetFieldOrPropertyValue(_hFlags, "mode");
+            string modeStr = emode?.ToString() ?? "";
+            AITalkPlugin.Log.LogInfo($"H场景开场，EMode={modeStr}");
+
+            string prompt = "";
+            switch (modeStr)
+            {
+                case "aibu": prompt = "[system]:[H场景开始爱抚阶段，用符合角色性格与情形的话说一句话。]"; break;
+                case "houshi": prompt = "[system]:[H场景开始口手奉仕阶段，用符合角色性格与情形的话说一句话。]"; break;
+                case "sonyu": prompt = "[system]:[H场景开始正式H阶段，用符合角色性格与情形的话说一句话。]"; break;
+                default: prompt = "[system]:[H场景开始，用符合角色性格与情形的话说一句话。]"; break;
+            }
+
+            TriggerHSceneTalk(CurrentHeroine, prompt);
         }
 
         private void TriggerHSceneTalk(SaveData.Heroine heroine, string playerInput)
@@ -649,7 +842,7 @@ namespace KKAITalk
                 chara.GaugeFemale = 0f;
 
             // 读取H场景功能点状态 (aibu/houshi/sonyu)
-            var emode = SafeGetFieldOrPropertyValue(_hFlags, "nowMode");
+            var emode = SafeGetFieldOrPropertyValue(_hFlags, "mode");
             if (emode != null)
                 chara.HMode = emode.ToString();
             else
@@ -709,11 +902,11 @@ namespace KKAITalk
         private string GetHAutoInput(string animState)
         {
             if (animState.Contains("Idle") && !animState.Contains("Insert"))
-                return "[system]:[H场景，待插入状态，用符合角色性格的话说一句话。]";
+                return "[system]:[H场景，待插入状态，用符合角色性格与情形的话说一句话。]";
             if (animState == "Insert")
-                return "[system]:[H场景，刚插入的瞬间，用符合角色性格的话说一句话。]";
+                return "[system]:[H场景，刚插入的瞬间，用符合角色性格与情形的话说一句话。]";
             if (animState.Contains("IN_A"))
-                return "[system]:[H场景，高潮结束后，用符合角色性格的话说一句话。]";
+                return "[system]:[H场景，高潮结束后，用符合角色性格与情形的话说一句话。]";
             return "";
         }
     }

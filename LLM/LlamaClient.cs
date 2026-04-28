@@ -17,7 +17,7 @@ namespace KKAITalk.LLM
 
     public class LlamaClient : MonoBehaviour
     {
-        private string _url = "http://127.0.0.1:4001/v1/chat/completions";
+        private string _url = "http://127.0.0.1:4000/v1/chat/completions";
         private string _model = "Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf";
 
         // 默认思考模式
