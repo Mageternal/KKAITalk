@@ -7,6 +7,7 @@ using KKAITalk.LLM;
 using KKAITalk.Memory;
 using KKAITalk.UI;
 using KKAPI.MainGame;
+using KK_Pregnancy;
 using System;
 using System.Reflection;
 using UnityEngine;
@@ -577,6 +578,7 @@ namespace KKAITalk
             _hSceneProc = hSceneProc;
             _hFlags = SafeGetFieldValue(hSceneProc, "flags");
             _lastAnimState = "";
+            _lastEMode = ""; // 重置EMode记录
 
             CloseSubtitles();
 
@@ -586,8 +588,18 @@ namespace KKAITalk
                 AIDialogueUI.Instance?.ShowInputMode(CurrentHeroine.Name ?? "");
                 AIDialogueUI.Instance?.SetPanelHeight(120f); // H场景使用较小的对话框
 
-                // 触发开场白（根据EMode决定）
-                Invoke("TriggerHSceneIntro", 0.5f);
+                // 直接读取EMode并触发开场白
+                var emode = SafeGetFieldOrPropertyValue(_hFlags, "mode");
+                string currentMode = emode?.ToString() ?? "";
+                _isFirstHLoad = true;
+
+                if (!string.IsNullOrEmpty(currentMode))
+                {
+                    AITalkPlugin.Log.LogInfo($"H场景开始，EMode={currentMode}");
+                    TriggerHSceneIntro(currentMode);
+                    _lastEMode = currentMode;
+                    _isFirstHLoad = false;
+                }
             }
 
             // 订阅玩家输入事件
@@ -611,12 +623,15 @@ namespace KKAITalk
             AIDialogueUI.Instance?.Hide();
             _hSceneProc = null;
             _hFlags = null;
+            _lastEMode = ""; // 重置EMode记录
             AITalkPlugin.Log.LogInfo("H场景AI模式关闭");
         }
 
         private string _pendingHAction = ""; // 记录待触发AI的动作类型
         private bool _isASeries = false; // 是否是A系列（A_Idle后还需要Idle再触发一次）
         private bool _isSSeries = false; // 是否是S系列（S_Idle后还需要Idle再触发一次）
+        private string _lastEMode = ""; // 记录上一次的EMode，用于检测阶段切换
+        private bool _isFirstHLoad = true; // H场景首次加载标志
 
         private void MonitorHScene()
         {
@@ -631,6 +646,15 @@ namespace KKAITalk
             var emode = SafeGetFieldOrPropertyValue(_hFlags, "mode");
             string currentMode = emode?.ToString() ?? "";
 
+            // H场景首次加载或EMode变化时，触发开场白（优先于动作状态检查）
+            if (_isFirstHLoad || (!string.IsNullOrEmpty(currentMode) && currentMode != _lastEMode))
+            {
+                AITalkPlugin.Log.LogInfo($"触发开场白: {_lastEMode} -> {currentMode}（首次加载:{_isFirstHLoad}）");
+                TriggerHSceneIntro(currentMode);
+                _lastEMode = currentMode;
+                _isFirstHLoad = false;
+            }
+
             // houshi 模式单独处理
             if (currentMode == "houshi")
             {
@@ -643,6 +667,27 @@ namespace KKAITalk
             }
 
             _lastAnimState = animState;
+        }
+
+        private void TriggerHSceneIntro(string mode)
+        {
+            if (CurrentHeroine == null) return;
+
+            string prompt = "";
+            switch (mode)
+            {
+                case "aibu": prompt = "[system]:[H场景开始爱抚阶段，用符合角色性格与情形的话说一句话。]"; // TODO: aibu阶段开始
+                    break;
+                case "houshi": prompt = "[system]:[H场景开始侍奉阶段，用符合角色性格与情形的话说一句话。]"; // TODO: houshi阶段开始
+                    break;
+                case "sonyu": prompt = "[system]:[H场景开始正式H阶段，用符合角色性格与情形的话说一句话。]"; // TODO: sonyu阶段开始
+                    break;
+            }
+
+            if (!string.IsNullOrEmpty(prompt))
+            {
+                TriggerHSceneTalk(CurrentHeroine, prompt);
+            }
         }
 
         private void HandleHoushiMode(string animState)
@@ -783,43 +828,23 @@ namespace KKAITalk
         {
             switch (actionType)
             {
-                case "K": return "刚才完成了接吻，用符合角色性格与情形的话说一句话。"; // TODO: K_Loop 后的 Idle
-                case "M": return "开始被上身爱抚，用符合角色性格与情形的话说一句话。"; // TODO: M_Idle
-                case "A_start": return "开始被下身爱抚，用符合角色性格与情形的话说一句话。"; // TODO: A_Idle
-                case "A_stop": return "刚才完成了下身爱抚，用符合角色性格与情形的话说一句话。"; // TODO: A_Idle 后的 Idle
-                case "S_start": return "开始被打屁股，用符合角色性格与情形的话说一句话。"; // TODO: S_Idle
-                case "S_stop": return "刚才完成了打屁股，用符合角色性格与情形的话说一句话。"; // TODO: S_Idle 后的 Idle
-                case "Orgasm": return "你刚刚高潮完了，用符合角色性格与情形的话说一句话。"; // TODO: Orgasm_A
+                case "K": return "[system]:[刚才完成了接吻，用符合角色性格与情形的话说一句话。]"; // TODO: K_Loop 后的 Idle
+                case "M": return "[system]:[开始被上身按摩，用符合角色性格与情形的话说一句话。]"; // TODO: M_Idle
+                case "A_start": return "[system]:[开始被下身按摩，用符合角色性格与情形的话说一句话。]"; // TODO: A_Idle
+                case "A_stop": return "[system]:[刚才完成了下身按摩，用符合角色性格与情形的话说一句话。]"; // TODO: A_Idle 后的 Idle
+                case "S_start": return "[system]:[开始被打屁股，用符合角色性格与情形的话说一句话。]"; // TODO: S_Idle
+                case "S_stop": return "[system]:[刚才完成了打屁股，用符合角色性格与情形的话说一句话。]"; // TODO: S_Idle 后的 Idle
+                case "Orgasm": return "[system]:[你刚刚高潮完了，用符合角色性格与情形的话说一句话。]"; // TODO: Orgasm_A
 
                 // houshi 模式
-                case "houshi_calm": return "你在温柔按摩男主，用符合角色性格与情形的话说一句话。"; // TODO: WLoop/SLoop
-                case "houshi_intense": return "你在激烈按摩男主，用符合角色性格与情形的话说一句话。"; // TODO: OLoop
-                case "Vomit": return "你把牛奶吐出了，用符合角色性格与情形的话说一句话。"; // TODO: Vomit_A
-                case "Drink": return "你把牛奶喝了，用符合角色性格与情形的话说一句话。"; // TODO: Drink_A
-                case "OUT": return "男主在你面前撒水，用符合角色性格与情形的话说一句话。"; // TODO: OUT_A
+                case "houshi_calm": return "[system]:[你在温柔按摩男主，用符合角色性格与情形的话说一句话。]"; // TODO: WLoop/SLoop
+                case "houshi_intense": return "[system]:[你在激烈按摩男主，用符合角色性格与情形的话说一句话。]"; // TODO: OLoop
+                case "Vomit": return "[system]:[你把牛奶吐出了，用符合角色性格与情形的话说一句话。]"; // TODO: Vomit_A
+                case "Drink": return "[system]:[你把牛奶喝了，用符合角色性格与情形的话说一句话。]"; // TODO: Drink_A
+                case "OUT": return "[system]:[男主在你面前撒水，用符合角色性格与情形的话说一句话。]"; // TODO: OUT_A
 
                 default: return "";
             }
-        }
-
-        private void TriggerHSceneIntro()
-        {
-            if (CurrentHeroine == null) return;
-
-            var emode = SafeGetFieldOrPropertyValue(_hFlags, "mode");
-            string modeStr = emode?.ToString() ?? "";
-            AITalkPlugin.Log.LogInfo($"H场景开场，EMode={modeStr}");
-
-            string prompt = "";
-            switch (modeStr)
-            {
-                case "aibu": prompt = "[system]:[H场景开始爱抚阶段，用符合角色性格与情形的话说一句话。]"; break;
-                case "houshi": prompt = "[system]:[H场景开始口手奉仕阶段，用符合角色性格与情形的话说一句话。]"; break;
-                case "sonyu": prompt = "[system]:[H场景开始正式H阶段，用符合角色性格与情形的话说一句话。]"; break;
-                default: prompt = "[system]:[H场景开始，用符合角色性格与情形的话说一句话。]"; break;
-            }
-
-            TriggerHSceneTalk(CurrentHeroine, prompt);
         }
 
         private void TriggerHSceneTalk(SaveData.Heroine heroine, string playerInput)
@@ -860,6 +885,28 @@ namespace KKAITalk
             }
             else
                 chara.AnimationName = "Unknown";
+
+            // 读取怀孕/安全期状态（KK_Pregnancy）
+            try
+            {
+                var status = KK_Pregnancy.PregnancyDataUtils.GetCharaStatus(heroine);
+                chara.IsSafeDay = (status == KK_Pregnancy.HeroineStatus.Safe);
+                chara.IsRiskyDay = (status == KK_Pregnancy.HeroineStatus.Risky);
+                chara.IsPregnant = (status == KK_Pregnancy.HeroineStatus.Pregnant);
+
+                // 读取怀孕周期
+                var pregData = KK_Pregnancy.PregnancyDataUtils.GetPregnancyData(heroine);
+                chara.PregnancyWeek = (pregData != null) ? pregData.Week : 0;
+
+                AITalkPlugin.Log.LogInfo($"怀孕状态: Safe={chara.IsSafeDay}, Risky={chara.IsRiskyDay}, Pregnant={chara.IsPregnant}, Week={chara.PregnancyWeek}");
+            }
+            catch
+            {
+                chara.IsSafeDay = false;
+                chara.IsRiskyDay = false;
+                chara.IsPregnant = false;
+                chara.PregnancyWeek = 0;
+            }
 
             AITalkPlugin.Log.LogInfo($"H场景数据: GaugeFemale={chara.GaugeFemale}%, AnimState={chara.NowAnimStateName}, Animation={chara.AnimationName}, IsAnalPlay={chara.IsAnalPlay}, HMode={chara.HMode}");
 

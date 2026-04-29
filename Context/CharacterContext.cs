@@ -47,5 +47,11 @@ namespace KKAITalk.Context
         public bool IsInHScene;
         public string HMode; // aibu/houshi/sonyu
 
+        // 怀孕/安全期状态（KK_Pregnancy）
+        public bool IsSafeDay; // 安全期
+        public bool IsRiskyDay; // 危险期
+        public bool IsPregnant; // 怀孕中
+        public int PregnancyWeek; // 怀孕周期（1~36周）
+
     }
 }

@@ -7,6 +7,7 @@ using static SaveData;
 using static Studio.Info.LightLoadInfo;
 using System.Collections;
 using System.Reflection;
+using KK_Pregnancy;
 
 namespace KKAITalk
 {
@@ -18,7 +19,13 @@ namespace KKAITalk
                 RunTest();
 
             if (Input.GetKeyDown(KeyCode.F9))
-                DumpHeroineStatus();
+                DumpVoiceFlagFields();
+
+            if (Input.GetKeyDown(KeyCode.F10))
+                DumpCurrentHeroineFields();
+
+            if (Input.GetKeyDown(KeyCode.F11))
+                DumpPregnancyStatus();
         }
 
         private void RunTest()
@@ -30,33 +37,51 @@ namespace KKAITalk
                 return;
             }
 
-            AITalkPlugin.Log.LogInfo("找到HSceneProc");
+            AITalkPlugin.Log.LogInfo("=== H场景字段列表 ===");
 
             // 找HFlag - 使用安全反射方法
             var flags = SafeGetFieldValue(hProc, "flags");
             if (flags == null)
             {
-                AITalkPlugin.Log.LogWarning("flags字段未找到，尝试搜索所有字段");
-                var allFields = SafeGetAllFields(hProc.GetType());
-                foreach (var f in allFields)
-                {
-                    AITalkPlugin.Log.LogInfo($"  字段: {f.Name} = {f.FieldType}");
-                }
+                AITalkPlugin.Log.LogWarning("flags字段未找到");
                 return;
             }
 
             AITalkPlugin.Log.LogInfo($"flags类型: {flags.GetType().FullName}");
+            AITalkPlugin.Log.LogInfo("=== flags 的所有字段和值 ===");
 
-            // 读取关键字段
-            string[] targets = { "gaugeMale", "gaugeFemale", "speed", "nowAnimStateName", "isAnalPlay" };
-            foreach (var name in targets)
+            // 列出flags的所有字段和值
+            var flagFields = SafeGetAllFields(flags.GetType());
+            foreach (var f in flagFields)
             {
-                // 使用安全的反射查找
-                var value = SafeGetFieldOrPropertyValue(flags, name);
-                if (value != null)
-                    AITalkPlugin.Log.LogInfo($"  {name} = {value}");
-                else
-                    AITalkPlugin.Log.LogWarning($"  {name} 未找到");
+                try
+                {
+                    var value = f.GetValue(flags);
+                    string valueStr = value != null ? value.ToString() : "null";
+                    AITalkPlugin.Log.LogInfo($"  {f.Name} ({f.FieldType.Name}) = {valueStr}");
+                }
+                catch (Exception ex)
+                {
+                    AITalkPlugin.Log.LogWarning($"  {f.Name}: {ex.Message}");
+                }
+            }
+
+            // 也列出HSceneProc的其他可能相关字段
+            AITalkPlugin.Log.LogInfo("=== HSceneProc 的其他字段 ===");
+            var procFields = SafeGetAllFields(hProc.GetType());
+            foreach (var f in procFields)
+            {
+                if (f.Name == "flags") continue; // 跳过flags，已经列过了
+                try
+                {
+                    var value = f.GetValue(hProc);
+                    string valueStr = value != null ? value.ToString() : "null";
+                    AITalkPlugin.Log.LogInfo($"  {f.Name} ({f.FieldType.Name}) = {valueStr}");
+                }
+                catch (Exception ex)
+                {
+                    AITalkPlugin.Log.LogWarning($"  {f.Name}: {ex.Message}");
+                }
             }
         }
 
@@ -151,6 +176,114 @@ namespace KKAITalk
                 var heroine = talkScene.targetHeroine;
                 var relationValue = SafeGetFieldOrPropertyValue(heroine, "relation");
                 AITalkPlugin.Log.LogInfo($"TalkScene heroine relation = {relationValue}");
+            }
+        }
+
+        private void DumpVoiceFlagFields()
+        {
+            var hProc = FindObjectOfType<HSceneProc>();
+            if (hProc == null)
+            {
+                AITalkPlugin.Log.LogWarning("不在H场景");
+                return;
+            }
+
+            // 获取flags
+            var flags = SafeGetFieldValue(hProc, "flags");
+            if (flags == null)
+            {
+                AITalkPlugin.Log.LogWarning("flags未找到");
+                return;
+            }
+
+            // 获取voice对象
+            var voice = SafeGetFieldValue(flags, "voice");
+            if (voice == null)
+            {
+                AITalkPlugin.Log.LogWarning("voice字段未找到");
+                return;
+            }
+
+            AITalkPlugin.Log.LogInfo("=== VoiceFlag 详细字段列表 ===");
+
+            // 列出voice的所有字段和值
+            var voiceFields = SafeGetAllFields(voice.GetType());
+            foreach (var f in voiceFields)
+            {
+                try
+                {
+                    var value = f.GetValue(voice);
+                    string valueStr = value != null ? value.ToString() : "null";
+                    AITalkPlugin.Log.LogInfo($"  {f.Name} ({f.FieldType.Name}) = {valueStr}");
+                }
+                catch (Exception ex)
+                {
+                    AITalkPlugin.Log.LogWarning($"  {f.Name}: {ex.Message}");
+                }
+            }
+        }
+
+        private void DumpCurrentHeroineFields()
+        {
+            var heroine = AITalkPlugin.CurrentHeroine;
+            if (heroine == null)
+            {
+                AITalkPlugin.Log.LogWarning("CurrentHeroine未找到");
+                return;
+            }
+
+            AITalkPlugin.Log.LogInfo("=== 女主角详细字段列表 ===");
+            AITalkPlugin.Log.LogInfo($"女主角: {heroine.Name}");
+
+            // 列出女主角的所有字段
+            var heroineFields = SafeGetAllFields(heroine.GetType());
+            foreach (var f in heroineFields)
+            {
+                try
+                {
+                    var value = f.GetValue(heroine);
+                    string valueStr = value != null ? value.ToString() : "null";
+                    AITalkPlugin.Log.LogInfo($"  {f.Name} ({f.FieldType.Name}) = {valueStr}");
+                }
+                catch (Exception ex)
+                {
+                    AITalkPlugin.Log.LogWarning($"  {f.Name}: {ex.Message}");
+                }
+            }
+        }
+
+        private void DumpPregnancyStatus()
+        {
+            var heroine = AITalkPlugin.CurrentHeroine;
+            if (heroine == null)
+            {
+                AITalkPlugin.Log.LogWarning("CurrentHeroine未找到");
+                return;
+            }
+
+            AITalkPlugin.Log.LogInfo("=== 怀孕状态（KK_Pregnancy） ===");
+            AITalkPlugin.Log.LogInfo($"女主角: {heroine.Name}");
+
+            try
+            {
+                // 使用 PregnancyDataUtils 获取状态
+                var status = PregnancyDataUtils.GetCharaStatus(heroine);
+                AITalkPlugin.Log.LogInfo($"  HeroineStatus = {status}");
+
+                // 获取详细数据
+                var pregData = PregnancyDataUtils.GetPregnancyData(heroine);
+                if (pregData != null)
+                {
+                    AITalkPlugin.Log.LogInfo($"  怀孕数据存在，Week = {pregData.Week}");
+                }
+                else
+                {
+                    AITalkPlugin.Log.LogInfo("  怀孕数据为null（未怀孕）");
+                }
+            }
+            catch (Exception ex)
+            {
+                AITalkPlugin.Log.LogWarning($"读取怀孕状态失败: {ex.Message}");
             }
         }
 

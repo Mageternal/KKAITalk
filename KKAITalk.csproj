@@ -57,6 +57,9 @@
       <HintPath>F:\Temp\game\PC game\Koikatsu BetterRepack RX21\BepInEx\plugins\KKAPI.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="KK_Pregnancy">
+      <HintPath>F:\Temp\game\PC game\Koikatsu BetterRepack RX21\BepInEx\plugins\KK_Pregnancy.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
