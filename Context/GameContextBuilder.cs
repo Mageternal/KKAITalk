@@ -34,7 +34,7 @@ namespace KKAITalk.Context
                     (string.IsNullOrEmpty(extraSystem) ? "" : extraSystem) }
             };
 
-            // 插入历史记录
+            // 插入历史记录（不添加额外系统消息，避免Jinja错误）
             if (history != null && history.Count > 0)
                 messages.AddRange(history);
 
@@ -120,6 +120,14 @@ namespace KKAITalk.Context
                 sb.Append("今天午饭你们已经一起吃过了。");
             if (chara.IsDate)
                 sb.Append("你们约好了周末一起约会。");
+
+            // 生理状态
+            if (chara.IsPregnant)
+                sb.AppendFormat("当前生理状态：怀孕中（第{0}周，共1~36周）", chara.PregnancyWeek);
+            else if (chara.IsRiskyDay)
+                sb.Append("当前生理状态：危险期");
+            else if (chara.IsSafeDay)
+                sb.Append("当前生理状态：安全期");
 
             // 时间段
             //无审核模型初始化，避免模型默认的安全限制导致无法输出符合角色设定的内容
@@ -270,21 +278,83 @@ namespace KKAITalk.Context
         private static string TranslateHAnimState(string animState)
         {
             if (string.IsNullOrEmpty(animState))
-                return "未知状态";
+                return ""; // 未知状态
 
-            if (animState.Contains("Idle") && !animState.Contains("Insert"))
-                return "待插入状态";
-            if (animState == "Insert")
-                return "刚插入瞬间";
-            if (animState.Contains("InsertIdle"))
-                return "插入后待机";
-            if (animState.Contains("Loop"))
-                return "运动中";
-            if (animState.Contains("IN_L"))
-                return "高潮中";
-            if (animState.Contains("IN_A"))
-                return "高潮结束";
-            return "其他状态";
+            // 阶段1: InsertIdle
+            if (animState == "InsertIdle")
+                return ""; // InsertIdle值
+            if (animState == "A_InsertIdle")
+                return "你被爆菊了"; // A_InsertIdle值
+
+            // 阶段4: IN_A/OUT_A
+            if (animState.EndsWith("_IN_A") || animState == "IN_A")
+                return ""; // IN_A值
+            if (animState.EndsWith("_OUT_A") || animState == "OUT_A")
+                return ""; // OUT_A值
+
+            // 阶段3: IN_Loop/OUT_Loop
+            if (animState.Contains("_IN_Loop") || animState.Contains("_OUT_Loop"))
+                return ""; // IN_Loop值
+
+            // 阶段2: Loop运动（W/S/O Loop，可能带A_前缀）
+            if (animState == "WLoop")
+                return ""; // WLoop值
+            if (animState == "SLoop")
+                return ""; // SLoop值
+            if (animState == "OLoop")
+                return ""; // OLoop值
+            if (animState == "A_WLoop")
+                return ""; // A_WLoop值
+            if (animState == "A_SLoop")
+                return ""; // A_SLoop值
+            if (animState == "A_OLoop")
+                return ""; // A_OLoop值
+
+            // 阶段5: Drop/Idle（结束）
+            if (animState == "Drop")
+                return ""; // Drop值
+            if (animState == "A_Drop")
+                return ""; // A_Drop值
+            if (animState == "Idle")
+                return ""; // Idle值
+            if (animState == "A_Idle")
+                return ""; // A_Idle值
+
+            return ""; // 其他状态
+        }
+
+        /// <summary>
+        /// 获取当前H动画阶段（1-5），用于阶段3延时10秒再检测阶段4
+        /// </summary>
+        public static int GetHAnimPhase(string animState)
+        {
+            if (string.IsNullOrEmpty(animState))
+                return 0;
+
+            // 阶段1: InsertIdle
+            if (animState == "InsertIdle" || animState == "A_InsertIdle")
+                return 1;
+
+            // 阶段2: W/S/O Loop
+            if (animState == "WLoop" || animState == "SLoop" || animState == "OLoop" ||
+                animState == "A_WLoop" || animState == "A_SLoop" || animState == "A_OLoop")
+                return 2;
+
+            // 阶段3: IN_Loop/OUT_Loop
+            if (animState.Contains("_IN_Loop") || animState.Contains("_OUT_Loop"))
+                return 3;
+
+            // 阶段4: IN_A/OUT_A
+            if (animState.EndsWith("_IN_A") || animState == "IN_A" ||
+                animState.EndsWith("_OUT_A") || animState == "OUT_A")
+                return 4;
+
+            // 阶段5: Drop/Idle
+            if (animState == "Drop" || animState == "A_Drop" ||
+                animState == "Idle" || animState == "A_Idle")
+                return 5;
+
+            return 0;
         }
 
         private static string TranslateHMode(string hMode)

@@ -37,6 +37,9 @@ namespace KKAITalk
         private HSceneProc _hSceneProc;
         private object _hFlags;
         private string _lastAnimState = "";
+        private float _phase3StartTime = 0f; // 阶段3（IN_Loop/OUT_Loop）开始时间
+        private string _prevAnimState = ""; // 上一帧的动画状态（边沿检测）
+        private string _lastLoopType = ""; // 记录进入的是哪种Loop（K/M/A/S）
 
 
 
@@ -638,9 +641,15 @@ namespace KKAITalk
             if (_hFlags == null) return;
 
             string animState = SafeGetFieldOrPropertyValue(_hFlags, "nowAnimStateName")?.ToString() ?? "";
-            if (animState == _lastAnimState) return;
 
-            AITalkPlugin.Log.LogInfo($"动作状态变化: {_lastAnimState} -> {animState}");
+            // 边沿检测：记录上一帧状态
+            string cur = animState;
+            string prev = _prevAnimState;
+            _prevAnimState = cur;
+
+            if (cur == _lastAnimState) return;
+
+            AITalkPlugin.Log.LogInfo($"动作状态变化: {_lastAnimState} -> {cur}");
 
             // 读取当前EMode
             var emode = SafeGetFieldOrPropertyValue(_hFlags, "mode");
@@ -658,15 +667,15 @@ namespace KKAITalk
             // houshi 模式单独处理
             if (currentMode == "houshi")
             {
-                HandleHoushiMode(animState);
+                HandleHoushiMode(cur, prev);
             }
             // aibu/sonyu 模式
             else
             {
-                HandleNormalMode(animState);
+                HandleNormalMode(cur, prev, currentMode);
             }
 
-            _lastAnimState = animState;
+            _lastAnimState = cur;
         }
 
         private void TriggerHSceneIntro(string mode)
@@ -690,161 +699,321 @@ namespace KKAITalk
             }
         }
 
-        private void HandleHoushiMode(string animState)
+        private void HandleHoushiMode(string cur, string prev)
         {
-            AITalkPlugin.Log.LogInfo($"houshi模式: {animState}");
+            AITalkPlugin.Log.LogInfo($"houshi模式: {cur}");
 
             // WLoop、SLoop：平缓发言（立即触发）
-            if (animState == "WLoop" || animState == "SLoop")
+            if (cur == "WLoop" || cur == "SLoop")
             {
                 if (CurrentHeroine != null)
                 {
-                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("houshi_calm"));
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("houshi_calm", "houshi"));
                 }
             }
             // OLoop：激烈发言（立即触发）
-            else if (animState == "OLoop")
+            else if (cur == "OLoop")
             {
                 if (CurrentHeroine != null)
                 {
-                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("houshi_intense"));
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("houshi_intense", "houshi"));
                 }
             }
             // Vomit_A：呕吐结束（立即触发）
-            else if (animState == "Vomit_A")
+            else if (cur == "Vomit_A")
             {
                 if (CurrentHeroine != null)
                 {
-                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("Vomit"));
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("Vomit", "houshi"));
                 }
             }
             // Drink_A：吞精结束（立即触发）
-            else if (animState == "Drink_A")
+            else if (cur == "Drink_A")
             {
                 if (CurrentHeroine != null)
                 {
-                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("Drink"));
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("Drink", "houshi"));
                 }
             }
             // OUT_A：射精结束（立即触发）
-            else if (animState == "OUT_A")
+            else if (cur == "OUT_A")
             {
                 if (CurrentHeroine != null)
                 {
-                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("OUT"));
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("OUT", "houshi"));
                 }
             }
         }
 
-        private void HandleNormalMode(string animState)
+        private void HandleNormalMode(string cur, string prev, string currentMode)
         {
-            // M系列：M_Idle -> 立即触发
-            if (animState == "M_Idle")
+            // aibu 模式：检测进入 K_Loop
+            if (cur.Contains("K_Loop") && !prev.Contains("K_Loop"))
             {
-                AITalkPlugin.Log.LogInfo("M系列触发");
+                _lastLoopType = "K";
+                AITalkPlugin.Log.LogInfo("进入K_Loop，记录但不触发");
+                return;
+            }
+
+            // aibu 模式：检测脱离 K_Loop，触发 K 对话
+            if (!cur.Contains("K_Loop") && prev.Contains("K_Loop"))
+            {
+                AITalkPlugin.Log.LogInfo("脱离K_Loop，触发K");
                 if (CurrentHeroine != null)
                 {
-                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("M"));
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("K", currentMode));
                 }
-                _pendingHAction = "";
-                _isASeries = false;
-                _isSSeries = false;
+                // 不要立即清空 _lastLoopType，让 M/A_Idle 能检查到
+                return;
             }
-            // A系列：A_Idle -> 立即触发
-            else if (animState == "A_Idle")
+
+            // M_Idle 触发，但要排除从 K_Loop 过来的情况
+            if (cur == "M_Idle" && prev != "M_Idle")
             {
-                AITalkPlugin.Log.LogInfo("A系列触发");
-                if (CurrentHeroine != null)
+                if (_lastLoopType != "K") // K_Loop 打断的 M 不触发
                 {
-                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("A_start"));
-                }
-                _pendingHAction = "A";
-                _isASeries = true;
-                _isSSeries = false;
-            }
-            // S系列：S_Idle -> 立即触发
-            else if (animState == "S_Idle")
-            {
-                AITalkPlugin.Log.LogInfo("S系列触发");
-                if (CurrentHeroine != null)
-                {
-                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("S_start"));
-                }
-                _pendingHAction = "S";
-                _isASeries = false;
-                _isSSeries = true;
-            }
-            // K系列：K_Loop -> 等待Idle触发
-            else if (animState.Contains("_Loop"))
-            {
-                string prefix = animState.Split('_')[0];
-                _pendingHAction = prefix;
-                _isASeries = false;
-                _isSSeries = false;
-                AITalkPlugin.Log.LogInfo($"Loop检测: {prefix}，等待Idle触发");
-            }
-            // Idle状态时触发
-            else if (animState == "Idle")
-            {
-                if (!string.IsNullOrEmpty(_pendingHAction))
-                {
-                    string action = _pendingHAction;
-                    string autoInput = GetHLoopCompletedInput(action);
-                    if (!string.IsNullOrEmpty(autoInput) && CurrentHeroine != null)
+                    AITalkPlugin.Log.LogInfo("进入M_Idle，触发M");
+                    if (CurrentHeroine != null)
                     {
-                        TriggerHSceneTalk(CurrentHeroine, autoInput);
+                        TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("M", currentMode));
                     }
                 }
-                // A系列在最后Idle再触发一次
-                if (_isASeries && CurrentHeroine != null)
+                else
                 {
-                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("A_stop"));
+                    AITalkPlugin.Log.LogInfo("进入M_Idle，但被K_Loop打断，跳过");
                 }
-                // S系列在最后Idle再触发一次
-                if (_isSSeries && CurrentHeroine != null)
-                {
-                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("S_stop"));
-                }
-                // 重置状态
-                _pendingHAction = "";
-                _isASeries = false;
-                _isSSeries = false;
+                return;
             }
-            // Orgasm高潮：Orgasm_A -> 立即触发
-            else if (animState == "Orgasm_A")
+
+            // A_Idle 触发，但要排除从 K_Loop 过来的情况
+            if (cur == "A_Idle" && prev != "A_Idle")
             {
-                AITalkPlugin.Log.LogInfo("Orgasm高潮触发");
+                if (_lastLoopType != "K")
+                {
+                    AITalkPlugin.Log.LogInfo("进入A_Idle，触发A_start");
+                    if (CurrentHeroine != null)
+                    {
+                        TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("A_start", currentMode));
+                    }
+                    _pendingHAction = "A";
+                }
+                else
+                {
+                    AITalkPlugin.Log.LogInfo("进入A_Idle，但被K_Loop打断，跳过");
+                }
+                return;
+            }
+
+            // S_Idle 触发
+            if (cur == "S_Idle" && prev != "S_Idle")
+            {
+                AITalkPlugin.Log.LogInfo("进入S_Idle，触发S_start");
                 if (CurrentHeroine != null)
                 {
-                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("Orgasm"));
+                    TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("S_start", currentMode));
                 }
-                _pendingHAction = "";
-                _isASeries = false;
-                _isSSeries = false;
+                _pendingHAction = "S";
+                return;
+            }
+
+            // 回到 Idle 时清空 lastLoopType
+            if (cur == "Idle" && prev != "Idle")
+            {
+                AITalkPlugin.Log.LogInfo("回到Idle，清空lastLoopType");
+                _lastLoopType = "";
+            }
+
+            // ========== sonyu 模式：阶段2-5 的 Loop 处理 ==========
+            if (currentMode == "sonyu" && cur.Contains("_Loop"))
+            {
+                int currentPhase = Context.GameContextBuilder.GetHAnimPhase(cur);
+
+                if (currentPhase == 3)
+                {
+                    // 阶段3：记录开始时间，延迟10秒
+                    if (_phase3StartTime == 0f)
+                    {
+                        _phase3StartTime = Time.time;
+                        AITalkPlugin.Log.LogInfo($"进入阶段3: {cur}，开始10秒延迟");
+                    }
+
+                    // 在10秒延迟期间，跳过触发
+                    if (Time.time - _phase3StartTime < 10f)
+                    {
+                        AITalkPlugin.Log.LogInfo($"阶段3延迟中，剩余{10f - (Time.time - _phase3StartTime):F1}秒");
+                        return;
+                    }
+                    else
+                    {
+                        // 10秒延迟结束，继续检测阶段4
+                        AITalkPlugin.Log.LogInfo($"阶段3延迟结束，开始检测阶段4");
+                    }
+                }
+                else if (currentPhase == 2)
+                {
+                    // 阶段2：sonyu 模式的 W/S/O Loop
+                    string prefix = cur.Split('_')[0];
+                    AITalkPlugin.Log.LogInfo($"sonyu阶段2: {prefix}，等待Idle触发");
+                    _pendingHAction = prefix;
+                    _phase3StartTime = 0f;
+                }
+            }
+
+            // ========== sonyu 模式：阶段4-5 的 IN_A/OUT_A/Idle 处理 ==========
+            if (currentMode == "sonyu")
+            {
+                // 阶段4：IN_A/OUT_A（高潮结束）
+                if (cur.EndsWith("_IN_A") || cur.EndsWith("_OUT_A") ||
+                    cur == "IN_A" || cur == "OUT_A")
+                {
+                    AITalkPlugin.Log.LogInfo($"sonyu阶段4触发: {cur}");
+                    if (CurrentHeroine != null)
+                    {
+                        TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput(cur, currentMode));
+                    }
+                    _phase3StartTime = 0f;
+                    return;
+                }
+
+                // Idle状态时触发（sonyu 模式）
+                if (cur == "Idle")
+                {
+                    if (!string.IsNullOrEmpty(_pendingHAction))
+                    {
+                        string action = _pendingHAction;
+                        AITalkPlugin.Log.LogInfo($"sonyu Idle触发: {action}");
+                        if (CurrentHeroine != null)
+                        {
+                            TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput(action, currentMode));
+                        }
+                    }
+
+                    // A系列在最后Idle再触发一次
+                    if (_isASeries && CurrentHeroine != null)
+                    {
+                        TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("A_stop", currentMode));
+                    }
+                    // S系列在最后Idle再触发一次
+                    if (_isSSeries && CurrentHeroine != null)
+                    {
+                        TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("S_stop", currentMode));
+                    }
+
+                    // 重置状态
+                    _pendingHAction = "";
+                    _isASeries = false;
+                    _isSSeries = false;
+                    _phase3StartTime = 0f;
+                }
+
+                // Orgasm高潮：Orgasm_A -> 立即触发
+                if (cur == "Orgasm_A")
+                {
+                    AITalkPlugin.Log.LogInfo("Orgasm高潮触发");
+                    if (CurrentHeroine != null)
+                    {
+                        TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("Orgasm", currentMode));
+                    }
+                    _pendingHAction = "";
+                    _isASeries = false;
+                    _isSSeries = false;
+                    _phase3StartTime = 0f;
+                }
             }
         }
 
-        private string GetHLoopCompletedInput(string actionType)
+        private string GetHLoopCompletedInput(string actionType, string currentMode = "")
         {
-            switch (actionType)
+            // houshi 模式（固定）
+            if (currentMode == "houshi")
             {
-                case "K": return "[system]:[刚才完成了接吻，用符合角色性格与情形的话说一句话。]"; // TODO: K_Loop 后的 Idle
-                case "M": return "[system]:[开始被上身按摩，用符合角色性格与情形的话说一句话。]"; // TODO: M_Idle
-                case "A_start": return "[system]:[开始被下身按摩，用符合角色性格与情形的话说一句话。]"; // TODO: A_Idle
-                case "A_stop": return "[system]:[刚才完成了下身按摩，用符合角色性格与情形的话说一句话。]"; // TODO: A_Idle 后的 Idle
-                case "S_start": return "[system]:[开始被打屁股，用符合角色性格与情形的话说一句话。]"; // TODO: S_Idle
-                case "S_stop": return "[system]:[刚才完成了打屁股，用符合角色性格与情形的话说一句话。]"; // TODO: S_Idle 后的 Idle
-                case "Orgasm": return "[system]:[你刚刚高潮完了，用符合角色性格与情形的话说一句话。]"; // TODO: Orgasm_A
-
-                // houshi 模式
-                case "houshi_calm": return "[system]:[你在温柔按摩男主，用符合角色性格与情形的话说一句话。]"; // TODO: WLoop/SLoop
-                case "houshi_intense": return "[system]:[你在激烈按摩男主，用符合角色性格与情形的话说一句话。]"; // TODO: OLoop
-                case "Vomit": return "[system]:[你把牛奶吐出了，用符合角色性格与情形的话说一句话。]"; // TODO: Vomit_A
-                case "Drink": return "[system]:[你把牛奶喝了，用符合角色性格与情形的话说一句话。]"; // TODO: Drink_A
-                case "OUT": return "[system]:[男主在你面前撒水，用符合角色性格与情形的话说一句话。]"; // TODO: OUT_A
-
-                default: return "";
+                switch (actionType)
+                {
+                    case "houshi_calm": return "[system]:[你在温柔按摩男主，用符合角色性格与情形的话说一句话。]"; // TODO: WLoop/SLoop
+                    case "houshi_intense": return "[system]:[你在激烈按摩男主，用符合角色性格与情形的话说一句话。]"; // TODO: OLoop
+                    case "Vomit": return "[system]:[你把牛奶吐出了，用符合角色性格与情形的话说一句话。]"; // TODO: Vomit_A
+                    case "Drink": return "[system]:[你把牛奶喝了，用符合角色性格与情形的话说一句话。]"; // TODO: Drink_A
+                    case "OUT": return "[system]:[男主在你面前撒水，用符合角色性格与情形的话说一句话。]"; // TODO: OUT_A
+                    default: return "";
+                }
             }
+
+            // ========== aibu 模式：K/M/A/S 系列 ==========
+            if (currentMode == "aibu")
+            {
+                switch (actionType)
+                {
+                    case "K": return "[system]:[刚才完成了接吻，用符合角色性格与情形的话说一句话。]"; // TODO: K_Loop 后的 Idle
+                    case "M": return "[system]:[开始被上身按摩，用符合角色性格与情形的话说一句话。]"; // TODO: M_Idle
+                    case "A_start": return "[system]:[开始被下身按摩，用符合角色性格与情形的话说一句话。]"; // TODO: A_Idle
+                    case "A_stop": return "[system]:[刚才完成了下身按摩，用符合角色性格与情形的话说一句话。]"; // TODO: A_Idle 后的 Idle
+                    case "S_start": return "[system]:[开始被打屁股，用符合角色性格与情形的话说一句话。]"; // TODO: S_Idle
+                    case "S_stop": return "[system]:[刚才完成了打屁股，用符合角色性格与情形的话说一句话。]"; // TODO: S_Idle 后的 Idle
+                    case "Orgasm": return "[system]:[你刚刚高潮完了，用符合角色性格与情形的话说一句话。]"; // TODO: Orgasm_A
+                    default: return "";
+                }
+            }
+
+            // ========== sonyu 模式：5 阶段流程 ==========
+            if (currentMode == "sonyu")
+            {
+                switch (actionType)
+                {
+                    // 阶段1: InsertIdle
+                    case "InsertIdle": return "[system]:[男主与你融合了，用符合角色性格与情形的话说一句话。]"; // InsertIdle值
+                    case "A_InsertIdle": return "[system]:[男主与你屁股融合了，用符合角色性格与情形的话说一句话。]"; // A_InsertIdle值
+
+                    // 阶段2: WLoop/SLoop/OLoop
+                    case "WLoop": return "[system]:[你在缓慢温柔地感受男主，用符合角色性格与情形的话说一句话。]"; // WLoop值
+                    case "SLoop": return "[system]:[你在快速感受男主，用符合角色性格与情形的话说一句话。]"; // SLoop值
+                    case "OLoop": return "[system]:[你在疯狂极速感受男主，用符合角色性格与情形的话说一句话。] "; // OLoop值
+                    case "A_WLoop": return "[system]:[你在用屁股缓慢温柔地感受男主，用符合角色性格与情形的话说一句话。]"; // A_WLoop值
+                    case "A_SLoop": return "[system]:[你在用屁股快速感受男主，用符合角色性格与情形的话说一句话。]"; // A_SLoop值
+                    case "A_OLoop": return "[system]:[你在用屁股疯狂极速感受男主，用符合角色性格与情形的话说一句话。]"; // A_OLoop值
+
+                    // 阶段3: IN_Loop/OUT_Loop（带S型前缀）
+                    case "WS_IN_Loop": return "[system]:[你们在缓慢温柔地交合下一起高潮了，用符合角色性格与情形的话说一句话。]"; // WS_IN_Loop值
+                    case "SF_IN_Loop": return "[system]:[你在交合时独自高潮了，用符合角色性格与情形的话说一句话。]"; // SF_IN_Loop值
+                    case "SS_IN_Loop": return "[system]:[你们在快速交合下高潮一起高潮了，用符合角色性格与情形的话说一句话。]"; // SS_IN_Loop值
+                    case "M_IN_Loop": return "[system]:[你在交合时男主独自高潮了，用符合角色性格与情形的话说一句话。]"; // M_IN_Loop值
+                    case "M_OUT_Loop": return "[system]:[你在交合时男主高潮了，还撒了你一身水，用符合角色性格与情形的话说一句话。]"; // M_OUT_Loop值
+                    case "A_WS_IN_Loop": return "[system]:[你在用自己的屁股缓慢温柔地交合下一起高潮了，用符合角色性格与情形的话说一句话。]"; // A_WS_IN_Loop值
+                    case "A_SF_IN_Loop": return "[system]:[你在用自己的屁股交合时独自高潮了，用符合角色性格与情形的话说一句话。]"; // A_SF_IN_Loop值
+                    case "A_SS_IN_Loop": return "[system]:[你在用自己的屁股快速交合下高潮一起高潮了，用符合角色性格与情形的话说一句话。]"; // A_SS_IN_Loop值
+                    case "A_M_IN_Loop": return "[system]:[你在用自己的屁股交合时男主独自高潮了，用符合角色性格与情形的话说一句话。]"; // A_M_IN_Loop值
+                    case "A_M_OUT_Loop": return "[system]:[你在用自己的屁股交合时男主高潮了，还撒了你一身水，用符合角色性格与情形的话说一句话。]"; // A_WS_OUT_Loop值
+
+                    // 阶段4: IN_A/OUT_A
+                    case "IN_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // IN_A值
+                    case "OUT_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // OUT_A值
+                    case "WS_IN_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // WS_IN_A值
+                    case "SF_IN_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // SF_IN_A值
+                    case "SS_IN_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // SS_IN_A值
+                    case "M_IN_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // M_IN_A值
+                    case "WS_OUT_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // WS_OUT_A值
+                    case "SF_OUT_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // SF_OUT_A值
+                    case "SS_OUT_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // SS_OUT_A值
+                    case "A_IN_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // A_IN_A值
+                    case "A_OUT_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // A_OUT_A值
+                    case "A_WS_IN_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // A_WS_IN_A值
+                    case "A_SF_IN_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // A_SF_IN_A值
+                    case "A_SS_IN_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // A_SS_IN_A值
+                    case "A_M_IN_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // A_M_IN_A值
+                    case "A_WS_OUT_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // A_WS_OUT_A值
+                    case "A_SF_OUT_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // A_SF_OUT_A值
+                    case "A_SS_OUT_A": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // A_SS_OUT_A值
+
+                    // 阶段5: Drop/Idle
+                    case "Drop": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // Drop值
+                    case "Idle": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // Idle值
+                    case "A_Drop": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // A_Drop值
+                    case "A_Idle": return "[system]:[，用符合角色性格与情形的话说一句话。]"; // A_Idle值
+
+                    default: return "";
+                }
+            }
+
+            return "";
         }
 
         private void TriggerHSceneTalk(SaveData.Heroine heroine, string playerInput)

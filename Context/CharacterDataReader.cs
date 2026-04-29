@@ -2,6 +2,7 @@
 using ExtensibleSaveFormat;
 using KKAPI.MainGame;
 using KKAPI.Utilities;
+using KK_Pregnancy;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -41,7 +42,7 @@ namespace KKAITalk.Context
 
             catch { }
 
-            return new CharacterContext
+            var chara = new CharacterContext
             {
                 Name = heroine.Name,
                 Personality = heroine.personality.ToString(),
@@ -68,7 +69,28 @@ namespace KKAITalk.Context
                 Relation = relation,
 
                 HExperience = heroine.HExperience,
+
+                // 怀孕/安全期状态（KK_Pregnancy）
+                IsSafeDay = false,
+                IsRiskyDay = false,
+                IsPregnant = false,
+                PregnancyWeek = 0,
             };
+
+            // 读取怀孕/安全期状态
+            try
+            {
+                var status = PregnancyDataUtils.GetCharaStatus(heroine);
+                chara.IsSafeDay = (status == HeroineStatus.Safe);
+                chara.IsRiskyDay = (status == HeroineStatus.Risky);
+                chara.IsPregnant = (status == HeroineStatus.Pregnant);
+
+                var pregData = PregnancyDataUtils.GetPregnancyData(heroine);
+                chara.PregnancyWeek = (pregData != null) ? pregData.Week : 0;
+            }
+            catch { }
+
+            return chara;
         }
         public static string ReadProfileText(ChaFile chaFile)
         {

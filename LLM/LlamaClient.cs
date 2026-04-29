@@ -137,7 +137,42 @@ namespace KKAITalk.LLM
                 else sb.Append(json[i]);
             }
 
-            return sb.Length > 0 ? sb.ToString() : null;
+            string raw = sb.Length > 0 ? sb.ToString() : null;
+            if (raw == null) return null;
+
+            // 过滤掉 <think> 和 思考标签
+            raw = StripThinkingTags(raw);
+
+            return raw;
+        }
+
+        private string StripThinkingTags(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+
+            // 处理 \n 形式的换行（JSON中转义后的换行）
+            text = text.Replace("\\n", "\n");
+
+            // 移除 <|im_start|> 和 <|im_end|> 等特殊标签
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"<\|im_(start|end)\|>", "");
+
+            // 移除 <think>... 或 <thought>...</thought> 等思考标签
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"<think>[\s\S]*?", "",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"<thought>[\s\S]*?</thought>", "",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            // 移除独立出现的 <think> 或 标记
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"", "",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"<think>", "",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            // 清理多余空行
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"\n{3,}", "\n\n");
+            text = text.Trim();
+
+            return text;
         }
 
     }
