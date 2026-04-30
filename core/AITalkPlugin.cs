@@ -6,6 +6,7 @@ using KKAITalk.Context;
 using KKAITalk.LLM;
 using KKAITalk.Memory;
 using KKAITalk.UI;
+using KKAITalk.Audio;
 using KKAPI.MainGame;
 using KK_Pregnancy;
 using System;
@@ -40,6 +41,7 @@ namespace KKAITalk
         private float _phase3StartTime = 0f; // 阶段3（IN_Loop/OUT_Loop）开始时间
         private string _prevAnimState = ""; // 上一帧的动画状态（边沿检测）
         private string _lastLoopType = ""; // 记录进入的是哪种Loop（K/M/A/S）
+        private AudioManager _audioManager; // 音频管理器
 
 
 
@@ -54,6 +56,11 @@ namespace KKAITalk
             var testObj = new GameObject("TestRunner");
             DontDestroyOnLoad(testObj);
             testObj.AddComponent<TestRunner>();
+
+            var audioObj = new GameObject("AudioManager");
+            DontDestroyOnLoad(audioObj);
+            _audioManager = audioObj.AddComponent<AudioManager>();
+            _audioManager.Initialize();
 
             UseThinking = Config.Bind(
                 "LLM",           // 分组

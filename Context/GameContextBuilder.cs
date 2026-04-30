@@ -218,10 +218,6 @@ namespace KKAITalk.Context
                 pleasureDesc = "尚未兴奋（" + chara.GaugeFemale.ToString("0") + "%）";
             sb.AppendFormat("- 女方快感：{0}", pleasureDesc);
 
-            // 当前动作描述
-            string animDesc = TranslateHAnimState(chara.NowAnimStateName);
-            sb.AppendFormat("- 当前动作：{0}（{1}）", chara.NowAnimStateName, animDesc);
-
             // 当前姿势名称
             if (!string.IsNullOrEmpty(chara.AnimationName) && chara.AnimationName != "Unknown")
                 sb.AppendFormat("- 当前姿势：{0}", chara.AnimationName);
@@ -275,57 +271,6 @@ namespace KKAITalk.Context
             }
         }
 
-        private static string TranslateHAnimState(string animState)
-        {
-            if (string.IsNullOrEmpty(animState))
-                return ""; // 未知状态
-
-            // 阶段1: InsertIdle
-            if (animState == "InsertIdle")
-                return ""; // InsertIdle值
-            if (animState == "A_InsertIdle")
-                return "你被爆菊了"; // A_InsertIdle值
-
-            // 阶段4: IN_A/OUT_A
-            if (animState.EndsWith("_IN_A") || animState == "IN_A")
-                return ""; // IN_A值
-            if (animState.EndsWith("_OUT_A") || animState == "OUT_A")
-                return ""; // OUT_A值
-
-            // 阶段3: IN_Loop/OUT_Loop
-            if (animState.Contains("_IN_Loop") || animState.Contains("_OUT_Loop"))
-                return ""; // IN_Loop值
-
-            // 阶段2: Loop运动（W/S/O Loop，可能带A_前缀）
-            if (animState == "WLoop")
-                return ""; // WLoop值
-            if (animState == "SLoop")
-                return ""; // SLoop值
-            if (animState == "OLoop")
-                return ""; // OLoop值
-            if (animState == "A_WLoop")
-                return ""; // A_WLoop值
-            if (animState == "A_SLoop")
-                return ""; // A_SLoop值
-            if (animState == "A_OLoop")
-                return ""; // A_OLoop值
-
-            // 阶段5: Drop/Idle（结束）
-            if (animState == "Drop")
-                return ""; // Drop值
-            if (animState == "A_Drop")
-                return ""; // A_Drop值
-            if (animState == "Idle")
-                return ""; // Idle值
-            if (animState == "A_Idle")
-                return ""; // A_Idle值
-
-            return ""; // 其他状态
-        }
-
-        /// <summary>
-        /// 获取当前H动画阶段（1-5），用于阶段3延时10秒再检测阶段4
-        /// </summary>
         public static int GetHAnimPhase(string animState)
         {
             if (string.IsNullOrEmpty(animState))

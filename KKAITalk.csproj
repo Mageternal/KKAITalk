@@ -76,6 +76,10 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Audio\AudioConfigManager.cs" />
+    <Compile Include="Audio\AudioManager.cs" />
+    <Compile Include="Audio\AudioPlayer.cs" />
+    <Compile Include="Audio\TTSClient.cs" />
     <Compile Include="Context\CharacterContext.cs" />
     <Compile Include="Context\CharacterDataReader.cs" />
     <Compile Include="Context\GameContextBuilder.cs" />
