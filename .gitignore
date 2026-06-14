@@ -362,3 +362,6 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /开发日志.txt
+/暂停记录点.txt
+/test.json
+/libs
