@@ -61,7 +61,7 @@ namespace KKAITalk.Audio
             // 加载喘息文件
             LoadRespiteFiles();
 
-            AITalkPlugin.Log.LogInfo($"[Audio] 音频播放器初始化完成");
+            AITalkPlugin.Log.LogInfo("[Audio] 音频播放器初始化完成");
         }
 
         /// <summary>
@@ -74,11 +74,11 @@ namespace KKAITalk.Audio
 
             if (_respiteFiles.Count > 0)
             {
-                AITalkPlugin.Log.LogInfo($"[Audio] 加载喘息文件: {_respiteFiles.Count} 个");
+                AITalkPlugin.Log.LogInfo("[Audio] 加载喘息文件: " + _respiteFiles.Count + " 个");
             }
             else
             {
-                AITalkPlugin.Log.LogWarning($"[Audio] 未找到喘息文件");
+                AITalkPlugin.Log.LogWarning("[Audio] 未找到喘息文件");
             }
         }
 
@@ -106,7 +106,7 @@ namespace KKAITalk.Audio
         {
             if (_isProcessingQueue || _voiceQueue.Count == 0)
             {
-                onComplete?.Invoke();
+                if (onComplete != null) onComplete.Invoke();
                 return;
             }
 
@@ -124,7 +124,7 @@ namespace KKAITalk.Audio
                     },
                     (error) =>
                     {
-                        AITalkPlugin.Log.LogError($"[Audio] TTS合成失败: {error}");
+                        AITalkPlugin.Log.LogError("[Audio] TTS合成失败: " + error);
                         _isProcessingQueue = false;
                     }
                 );
@@ -156,7 +156,7 @@ namespace KKAITalk.Audio
                         source.clip = audioClip;
                         source.Play();
 
-                        AITalkPlugin.Log.LogInfo($"[Audio] 播放音频，时长: {audioClip.length:F2}s");
+                        AITalkPlugin.Log.LogInfo("[Audio] 播放音频，时长: " + audioClip.length.ToString("F2") + "s");
                     }
                 }
                 else
@@ -166,7 +166,7 @@ namespace KKAITalk.Audio
             }
             catch (Exception ex)
             {
-                AITalkPlugin.Log.LogError($"[Audio] 播放音频失败: {ex.Message}");
+                AITalkPlugin.Log.LogError("[Audio] 播放音频失败: " + ex.Message);
             }
         }
 
@@ -228,11 +228,11 @@ namespace KKAITalk.Audio
                 var audioData = File.ReadAllBytes(file);
                 PlayAudioData(audioData, _respiteSource);
 
-                AITalkPlugin.Log.LogInfo($"[Audio] 播放喘息: {Path.GetFileName(file)}");
+                AITalkPlugin.Log.LogInfo("[Audio] 播放喘息: " + Path.GetFileName(file));
             }
             catch (Exception ex)
             {
-                AITalkPlugin.Log.LogError($"[Audio] 播放喘息失败: {ex.Message}");
+                AITalkPlugin.Log.LogError("[Audio] 播放喘息失败: " + ex.Message);
             }
         }
 
@@ -292,11 +292,17 @@ namespace KKAITalk.Audio
         /// <summary>
         /// 是否正在播放发言
         /// </summary>
-        public bool IsPlayingVoice => _voiceSource.isPlaying || _voiceQueue.Count > 0;
+        public bool IsPlayingVoice
+        {
+            get { return _voiceSource.isPlaying || _voiceQueue.Count > 0; }
+        }
 
         /// <summary>
         /// 是否正在播放喘息
         /// </summary>
-        public bool IsPlayingRespite => _respiteSource.isPlaying;
+        public bool IsPlayingRespite
+        {
+            get { return _respiteSource.isPlaying; }
+        }
     }
 }

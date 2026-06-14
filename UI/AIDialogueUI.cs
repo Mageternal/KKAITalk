@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
-using static System.Net.Mime.MediaTypeNames;
+// removed using static System.Net.Mime.MediaTypeNames;
 using Image = UnityEngine.UI.Image;
 using Text = UnityEngine.UI.Text;
 

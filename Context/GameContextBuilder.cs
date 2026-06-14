@@ -152,7 +152,10 @@ namespace KKAITalk.Context
 
                 // 动态生成事件标签
                 var events = new System.Text.StringBuilder();
-                events.Append("只有当玩家明确发出请求且你决定接受时，才在回复末尾附加对应标签，否则用[EVENT:NONE]：");
+                events.Append("事件标签规则（重要！必须严格遵守）：" +
+                    "1) 只有【玩家本轮发言里明确提出请求】且【你同意接受】时，才附加对应标签。" +
+                    "2) 如果是你主动提议做某件事（例如「要不要一起去食堂」），即使你想邀请玩家，**绝对不要**附加事件标签——必须等玩家在下一轮明确说「好」「走」之类同意的话。" +
+                    "3) 其他所有情况都用 [EVENT:NONE]。");
 
                 if (!chara.IsGirlfriend)
                     events.Append("[EVENT:CONFESS]你接受了表白；");

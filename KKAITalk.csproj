@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>KKAITalk</RootNamespace>
     <AssemblyName>KKAITalk</AssemblyName>
-    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
     <TargetFrameworkProfile />
@@ -19,16 +19,17 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>F:\Temp\game\PC game\Koikatsu BetterRepack RX21\BepInEx\plugins\KKAITalk\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>DEBUG;TRACE;KK</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
+    <GenerateSerializationAssemblies>Auto</GenerateSerializationAssemblies>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
+    <DefineConstants>TRACE;KK</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
@@ -60,12 +61,8 @@
     <Reference Include="KK_Pregnancy">
       <HintPath>F:\Temp\game\PC game\Koikatsu BetterRepack RX21\BepInEx\plugins\KK_Pregnancy.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
     <Reference Include="UnityEngine">
       <HintPath>F:\Temp\game\PC game\Koikatsu BetterRepack RX21\Koikatu_Data\Managed\UnityEngine.dll</HintPath>
@@ -76,13 +73,13 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Context\CharacterContext.cs" />
+    <Compile Include="Context\CharacterDataReader.cs" />
+    <Compile Include="Context\GameContextBuilder.cs" />
     <Compile Include="Audio\AudioConfigManager.cs" />
     <Compile Include="Audio\AudioManager.cs" />
     <Compile Include="Audio\AudioPlayer.cs" />
     <Compile Include="Audio\TTSClient.cs" />
-    <Compile Include="Context\CharacterContext.cs" />
-    <Compile Include="Context\CharacterDataReader.cs" />
-    <Compile Include="Context\GameContextBuilder.cs" />
     <Compile Include="core\AITalkGameController.cs" />
     <Compile Include="core\AITalkPlugin.cs" />
     <Compile Include="core\test.cs" />

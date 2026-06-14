@@ -1,5 +1,6 @@
 ﻿using ActionGame;
 using KKAITalk;
+using KKAITalk.Audio;
 using KKAITalk.Context;
 using KKAITalk.LLM;
 using KKAITalk.Memory;
@@ -7,7 +8,6 @@ using KKAITalk.UI;
 using KKAPI.MainGame;
 using System.IO;
 using UnityEngine;
-using static SaveData;
 
 namespace KKAITalk
 {
@@ -115,6 +115,14 @@ namespace KKAITalk
 
                     // UI和历史记录用cleanReply
                     AIDialogueUI.Instance?.ShowReply(cleanReply);
+
+                    // TTS 播放 AI 回复
+                    var am = AITalkPlugin.Instance != null ? AITalkPlugin.Instance.GetAudioManager() : null;
+                    if (am != null && !string.IsNullOrEmpty(cleanReply))
+                    {
+                        am.Speak(cleanReply, null);
+                    }
+
                     string cleanInput = System.Text.RegularExpressions.Regex.Replace(
                         playerInput, @"\[situation\]:\[.*?\]", "").Trim();
                     if (!string.IsNullOrEmpty(cleanInput))

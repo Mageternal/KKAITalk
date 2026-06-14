@@ -3,11 +3,10 @@ using KKAPI.Maker;
 using System;
 using System.Linq;
 using UnityEngine;
-using static SaveData;
-using static Studio.Info.LightLoadInfo;
 using System.Collections;
 using System.Reflection;
 using KK_Pregnancy;
+using KKAITalk.Audio;
 
 namespace KKAITalk
 {
@@ -26,6 +25,9 @@ namespace KKAITalk
 
             if (Input.GetKeyDown(KeyCode.F11))
                 DumpPregnancyStatus();
+
+            if (Input.GetKeyDown(KeyCode.F12))
+                TestTTS();
         }
 
         private void RunTest()
@@ -374,6 +376,84 @@ namespace KKAITalk
             {
                 AITalkPlugin.Log.LogWarning($"DumpExtData: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// 测试 TTS 语音合成功能（F12）
+        /// </summary>
+        private void TestTTS()
+        {
+            AITalkPlugin.Log.LogInfo("=== 开始测试 TTS 语音合成 ===");
+
+            // 1. 获取 AudioManager
+            var audioManager = GetAudioManager();
+            if (audioManager == null)
+            {
+                AITalkPlugin.Log.LogError("找不到 AudioManager，请确认插件已正确加载");
+                return;
+            }
+
+            // 2. 设置测试角色
+            string testCharacter = "高垣 枫";
+            AITalkPlugin.Log.LogInfo("设置测试角色: " + testCharacter);
+            audioManager.SetCurrentCharacter(testCharacter);
+
+            // 3. 检查配置是否完整
+            if (!audioManager.ConfigManager.HasValidTTSConfig())
+            {
+                AITalkPlugin.Log.LogError("TTS 配置不完整，请检查：");
+                AITalkPlugin.Log.LogError("  1. audio_config.ini 中是否配置了 [timbre_" + testCharacter + "]");
+                AITalkPlugin.Log.LogError("  2. ref_audio 是否存在");
+                AITalkPlugin.Log.LogError("  3. ref_text 是否已填写");
+                return;
+            }
+
+            AITalkPlugin.Log.LogInfo("TTS 配置检查通过");
+
+            // 4. 检查服务器状态
+            AITalkPlugin.Log.LogInfo("检查 TTS 服务器状态...");
+            audioManager.CheckServerStatus((isOnline) =>
+            {
+                if (!isOnline)
+                {
+                    AITalkPlugin.Log.LogError("TTS 服务器未响应！请确认：");
+                    AITalkPlugin.Log.LogError("  - Qwen3-TTS 服务是否已启动");
+                    AITalkPlugin.Log.LogError("  - 服务地址是否为 127.0.0.1:9881");
+                    return;
+                }
+
+                AITalkPlugin.Log.LogInfo("TTS 服务器在线");
+
+                // 5. 合成并播放测试语音
+                string testText = "你好，这是一段测试语音。我是高垣枫，很高兴认识你。";
+                AITalkPlugin.Log.LogInfo("开始合成语音: " + testText);
+
+                audioManager.Speak(testText, () =>
+                {
+                    AITalkPlugin.Log.LogInfo("语音播放完成");
+                });
+            });
+        }
+
+        /// <summary>
+        /// 获取 AudioManager 实例
+        /// </summary>
+        private AudioManager GetAudioManager()
+        {
+            // 通过 AITalkPlugin.Instance 获取
+            if (AITalkPlugin.Instance != null)
+            {
+                var audioManager = AITalkPlugin.Instance.GetComponent<AudioManager>();
+                if (audioManager != null)
+                    return audioManager;
+            }
+
+            // 如果 Instance 获取失败，尝试 FindObjectOfType
+            var foundManager = FindObjectOfType<AudioManager>();
+            if (foundManager != null)
+                return foundManager;
+
+            return null;
         }
     }
 }

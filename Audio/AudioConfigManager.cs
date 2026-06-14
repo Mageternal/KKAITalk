@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 
 namespace KKAITalk.Audio
 {
@@ -9,13 +10,23 @@ namespace KKAITalk.Audio
     /// 音频配置管理器
     /// 配置文件路径: BepInEx\plugins\KKAITalk\audio_config.ini
     /// </summary>
-    public class AudioConfigManager
+    public class AudioConfigManager : MonoBehaviour
     {
-        private static readonly string BasePath = Paths.PluginPath;
-        private static readonly string ConfigPath = Path.Combine(BasePath, "audio_config.ini");
-        private static readonly string AudioPath = Path.Combine(BasePath, "audio");
-        private static readonly string RespitePath = Path.Combine(AudioPath, "respite");
-        private static readonly string TimbrePath = Path.Combine(AudioPath, "timbre");
+        private static readonly string BasePath;
+        static AudioConfigManager()
+        {
+            // 获取 BepInEx\plugins\ 路径
+            string pluginPath = BepInEx.Paths.PluginPath;
+            if (string.IsNullOrEmpty(pluginPath))
+                pluginPath = BepInEx.Paths.BepInExRootPath;
+
+            // 拼接插件目录名：BepInEx\plugins\KKAITalk\
+            BasePath = Path.Combine(pluginPath ?? "", "KKAITalk");
+        }
+        private static string ConfigPath() { return Path.Combine(BasePath ?? "", "audio_config.ini"); }
+        private static string AudioPath() { return Path.Combine(BasePath ?? "", "audio"); }
+        private static string RespitePath() { return Path.Combine(Path.Combine(BasePath ?? "", "audio"), "respite"); }
+        private static string TimbrePath() { return Path.Combine(Path.Combine(BasePath ?? "", "audio"), "timbre"); }
 
         /// <summary>
         /// 角色音色配置
@@ -44,27 +55,44 @@ namespace KKAITalk.Audio
         public class RespiteConfig
         {
             public string CharacterName { get; set; }
-            public List<string> AudioFiles { get; set; } = new List<string>();
+            public List<string> AudioFiles { get; set; }
+            public RespiteConfig() { AudioFiles = new List<string>(); }
         }
 
         private Dictionary<string, TimbreConfig> _timbreConfigs = new Dictionary<string, TimbreConfig>();
         private Dictionary<string, RespiteConfig> _respiteConfigs = new Dictionary<string, RespiteConfig>();
         private string _currentCharacter = "";
+        // 服务端返回的音色缓存 key，每次 Talk 场景加载时刷新
+        private string _currentCacheKey = "";
+        private string _pendingCacheKey = ""; // EncodeVoice 期间缓存，等待 HTTP 完成
+        private bool _isPreloading = false;
 
         /// <summary>
         /// 初始化：创建目录、加载配置
         /// </summary>
         public void Initialize()
         {
-            // 创建目录
-            CreateDirectories();
+            try
+            {
+                CreateDirectories();
+            }
+            catch (Exception ex)
+            {
+                if (AITalkPlugin.Log != null) AITalkPlugin.Log.LogError("[Audio] CreateDirectories失败: " + ex.Message);
+            }
 
-            // 加载配置
-            LoadConfig();
+            try
+            {
+                LoadConfig();
+            }
+            catch (Exception ex)
+            {
+                if (AITalkPlugin.Log != null) AITalkPlugin.Log.LogError("[Audio] LoadConfig失败: " + ex.Message);
+            }
 
-            AITalkPlugin.Log.LogInfo($"[Audio] 音频配置初始化完成");
-            AITalkPlugin.Log.LogInfo($"[Audio] 配置路径: {ConfigPath}");
-            AITalkPlugin.Log.LogInfo($"[Audio] 音频路径: {AudioPath}");
+            if (AITalkPlugin.Log != null) AITalkPlugin.Log.LogInfo("[Audio] 音频配置初始化完成");
+            if (AITalkPlugin.Log != null) AITalkPlugin.Log.LogInfo("[Audio] 配置路径: " + ConfigPath());
+            if (AITalkPlugin.Log != null) AITalkPlugin.Log.LogInfo("[Audio] 音频路径: " + AudioPath());
         }
 
         /// <summary>
@@ -74,20 +102,21 @@ namespace KKAITalk.Audio
         {
             try
             {
-                if (!Directory.Exists(AudioPath))
-                    Directory.CreateDirectory(AudioPath);
+                string audioDir = AudioPath();
+                if (!Directory.Exists(audioDir))
+                    Directory.CreateDirectory(audioDir);
 
-                if (!Directory.Exists(RespitePath))
-                    Directory.CreateDirectory(RespitePath);
+                if (!Directory.Exists(RespitePath()))
+                    Directory.CreateDirectory(RespitePath());
 
-                if (!Directory.Exists(TimbrePath))
-                    Directory.CreateDirectory(TimbrePath);
+                if (!Directory.Exists(TimbrePath()))
+                    Directory.CreateDirectory(TimbrePath());
 
-                AITalkPlugin.Log.LogInfo($"[Audio] 目录创建完成: {AudioPath}");
+                if (AITalkPlugin.Log != null) AITalkPlugin.Log.LogInfo("[Audio] 目录创建完成: " + audioDir);
             }
             catch (Exception ex)
             {
-                AITalkPlugin.Log.LogError($"[Audio] 创建目录失败: {ex.Message}");
+                if (AITalkPlugin.Log != null) AITalkPlugin.Log.LogError("[Audio] 创建目录失败: " + ex.Message);
             }
         }
 
@@ -96,7 +125,7 @@ namespace KKAITalk.Audio
         /// </summary>
         private void LoadConfig()
         {
-            if (!File.Exists(ConfigPath))
+            if (!File.Exists(ConfigPath()))
             {
                 CreateDefaultConfig();
                 return;
@@ -107,7 +136,7 @@ namespace KKAITalk.Audio
                 _timbreConfigs.Clear();
                 _respiteConfigs.Clear();
 
-                var lines = File.ReadAllLines(ConfigPath);
+                var lines = File.ReadAllLines(ConfigPath());
                 string currentSection = "";
                 TimbreConfig currentTimbre = null;
 
@@ -115,9 +144,13 @@ namespace KKAITalk.Audio
                 {
                     var trimmed = line.Trim();
 
+
                     // 节头
                     if (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
                     {
+                        if (currentTimbre != null)
+                            _timbreConfigs[currentTimbre.CharacterName] = currentTimbre;
+
                         currentSection = trimmed.Substring(1, trimmed.Length - 2);
 
                         if (currentSection.StartsWith("timbre_"))
@@ -133,6 +166,8 @@ namespace KKAITalk.Audio
                         }
                         continue;
                     }
+                    if (currentTimbre != null)
+                        _timbreConfigs[currentTimbre.CharacterName] = currentTimbre;
 
                     if (currentTimbre != null && trimmed.Contains("="))
                     {
@@ -172,11 +207,11 @@ namespace KKAITalk.Audio
                     // 如果配置文件有内容会覆盖默认
                 }
 
-                AITalkPlugin.Log.LogInfo($"[Audio] 配置文件加载完成");
+                if (AITalkPlugin.Log != null) AITalkPlugin.Log.LogInfo("[Audio] 配置文件加载完成");
             }
             catch (Exception ex)
             {
-                AITalkPlugin.Log.LogError($"[Audio] 加载配置失败: {ex.Message}");
+                AITalkPlugin.Log.LogError("[Audio] 加载配置失败: " + ex.Message);
                 CreateDefaultConfig();
             }
         }
@@ -188,42 +223,39 @@ namespace KKAITalk.Audio
         {
             try
             {
-                using (var writer = new StreamWriter(ConfigPath))
-                {
-                    writer.WriteLine("; KKAITalk 音频配置文件");
-                    writer.WriteLine("; 路径: BepInEx\\plugins\\KKAITalk\\audio_config.ini");
-                    writer.WriteLine();
-                    writer.WriteLine("; ===== 角色音色配置 =====");
-                    writer.WriteLine("; [timbre_角色名]");
-                    writer.WriteLine("; ref_audio: 参考音频文件路径（相对于 audio\\timbre 文件夹）");
-                    writer.WriteLine("; ref_text: 参考音频对应的文本");
-                    writer.WriteLine("; language: 语言（chinese/english/japanese等）");
-                    writer.WriteLine("; temperature: 采样温度（0.0-1.0）");
-                    writer.WriteLine("; sub_temperature: 子采样温度（0.0-1.0）");
-                    writer.WriteLine("; instruct: 情感指令（如：温柔撒娇、冷静等）");
-                    writer.WriteLine();
-                    writer.WriteLine("; ===== 角色喘息配置 =====");
-                    writer.WriteLine("; [respite_角色名]");
-                    writer.WriteLine("; audio_files: 喘息音频文件列表（相对于 audio\\respite 文件夹，用 | 分隔）");
-                    writer.WriteLine();
-                    writer.WriteLine("; ===== 示例 =====");
-                    writer.WriteLine(";[timbre_test]");
-                    writer.WriteLine(";ref_audio=test.wav");
-                    writer.WriteLine(";ref_text=这是一段测试文本");
-                    writer.WriteLine(";language=chinese");
-                    writer.WriteLine(";temperature=0.6");
-                    writer.WriteLine(";sub_temperature=0.6");
-                    writer.WriteLine(";instruct=温柔地说");
-                    writer.WriteLine();
-                    writer.WriteLine(";[respite_test]");
-                    writer.WriteLine(";audio_files=respite1.wav|respite2.wav");
-                }
+                var content = "; KKAITalk 音频配置文件\n" +
+                    "; 路径: BepInEx\\plugins\\KKAITalk\\audio_config.ini\n\n" +
+                    "; ===== 角色音色配置 =====\n" +
+                    "; [timbre_角色名]\n" +
+                    "; ref_audio: 参考音频文件路径（相对于 audio\\timbre 文件夹）\n" +
+                    "; ref_text: 参考音频对应的文本\n" +
+                    "; language: 语言（chinese/english/japanese等）\n" +
+                    "; temperature: 采样温度（0.0-1.0）\n" +
+                    "; sub_temperature: 子采样温度（0.0-1.0）\n" +
+                    "; instruct: 情感指令（如：温柔撒娇、冷静等）\n\n" +
+                    "; ===== 角色喘息配置 =====\n" +
+                    "; [respite_角色名]\n" +
+                    "; audio_files: 喘息音频文件列表（相对于 audio\\respite 文件夹，用 | 分隔）\n\n" +
+                    "; ===== 示例 =====\n" +
+                    ";[timbre_test]\n" +
+                    ";ref_audio=test.wav\n" +
+                    ";ref_text=这是一段测试文本\n" +
+                    ";language=chinese\n" +
+                    ";temperature=0.6\n" +
+                    ";sub_temperature=0.6\n" +
+                    ";instruct=温柔地说\n\n" +
+                    ";[respite_test]\n" +
+                    ";audio_files=respite1.wav|respite2.wav\n";
 
-                AITalkPlugin.Log.LogInfo($"[Audio] 默认配置文件已创建: {ConfigPath}");
+                File.WriteAllText(ConfigPath(), content);
+
+                if (AITalkPlugin.Log != null)
+                    AITalkPlugin.Log.LogInfo("[Audio] 默认配置文件已创建: " + ConfigPath());
             }
             catch (Exception ex)
             {
-                AITalkPlugin.Log.LogError($"[Audio] 创建配置文件失败: {ex.Message}");
+                if (AITalkPlugin.Log != null)
+                    AITalkPlugin.Log.LogError("[Audio] 创建配置文件失败: " + ex.Message);
             }
         }
 
@@ -232,8 +264,15 @@ namespace KKAITalk.Audio
         /// </summary>
         public void SetCurrentCharacter(string characterName)
         {
+            // 切换角色时清空旧 cache_key，避免误用上一角色的音色
+            if (_currentCharacter != characterName)
+            {
+                _currentCacheKey = "";
+                _pendingCacheKey = "";
+                _isPreloading = false;
+            }
             _currentCharacter = characterName;
-            AITalkPlugin.Log.LogInfo($"[Audio] 当前角色锁定: {characterName}");
+            if (AITalkPlugin.Log != null) AITalkPlugin.Log.LogInfo("[Audio] 当前角色锁定: " + characterName);
         }
 
         /// <summary>
@@ -242,6 +281,49 @@ namespace KKAITalk.Audio
         public string GetCurrentCharacter()
         {
             return _currentCharacter;
+        }
+
+        /// <summary>
+        /// 获取当前 cache_key（可能为空，表示未预热或预热失败）
+        /// </summary>
+        public string GetCacheKey()
+        {
+            return _currentCacheKey;
+        }
+
+        /// <summary>
+        /// 由 TTSClient.EncodeVoice 完成后调用，存入 cache_key
+        /// </summary>
+        public void SetCacheKey(string cacheKey)
+        {
+            _currentCacheKey = cacheKey ?? "";
+            _isPreloading = false;
+        }
+
+        /// <summary>
+        /// EncodeVoice 启动时调用，标记预热中
+        /// </summary>
+        public void BeginPreload()
+        {
+            _isPreloading = true;
+            _pendingCacheKey = "";
+        }
+
+        /// <summary>
+        /// 预热失败时调用，清空状态
+        /// </summary>
+        public void FailPreload()
+        {
+            _isPreloading = false;
+            _pendingCacheKey = "";
+        }
+
+        /// <summary>
+        /// 是否正在预热
+        /// </summary>
+        public bool IsPreloading
+        {
+            get { return _isPreloading; }
         }
 
         /// <summary>
@@ -264,10 +346,10 @@ namespace KKAITalk.Audio
         /// </summary>
         private TimbreConfig FindTimbreConfigByFile()
         {
-            if (!Directory.Exists(TimbrePath))
+            if (!Directory.Exists(TimbrePath()))
                 return null;
 
-            var files = Directory.GetFiles(TimbrePath, "*.wav");
+            var files = Directory.GetFiles(TimbrePath(), "*.wav");
             foreach (var file in files)
             {
                 var fileName = Path.GetFileNameWithoutExtension(file);
@@ -291,7 +373,7 @@ namespace KKAITalk.Audio
                 var fullPaths = new List<string>();
                 foreach (var file in config.AudioFiles)
                 {
-                    var fullPath = Path.Combine(RespitePath, file);
+                    var fullPath = Path.Combine(RespitePath(), file);
                     if (File.Exists(fullPath))
                         fullPaths.Add(fullPath);
                 }
@@ -299,7 +381,7 @@ namespace KKAITalk.Audio
             }
 
             // 尝试通过角色名查找喘息文件夹
-            var respiteDir = Path.Combine(RespitePath, _currentCharacter);
+            var respiteDir = Path.Combine(RespitePath(), _currentCharacter);
             if (Directory.Exists(respiteDir))
             {
                 var files = Directory.GetFiles(respiteDir, "*.wav");
@@ -322,7 +404,7 @@ namespace KKAITalk.Audio
                 return File.Exists(relativePath) ? relativePath : null;
 
             // 相对路径
-            return Path.Combine(TimbrePath, relativePath);
+            return Path.Combine(TimbrePath(), relativePath);
         }
 
         /// <summary>
@@ -330,7 +412,7 @@ namespace KKAITalk.Audio
         /// </summary>
         public string GetRespitePath()
         {
-            return RespitePath;
+            return RespitePath();
         }
 
         /// <summary>
@@ -338,7 +420,7 @@ namespace KKAITalk.Audio
         /// </summary>
         public string GetTimbrePath()
         {
-            return TimbrePath;
+            return TimbrePath();
         }
 
         /// <summary>
@@ -348,7 +430,7 @@ namespace KKAITalk.Audio
         {
             try
             {
-                using (var writer = new StreamWriter(ConfigPath))
+                using (var writer = new StreamWriter(ConfigPath()))
                 {
                     writer.WriteLine("; KKAITalk 音频配置文件");
                     writer.WriteLine();
@@ -357,13 +439,13 @@ namespace KKAITalk.Audio
                     writer.WriteLine("; ===== 角色音色配置 =====");
                     foreach (var kvp in _timbreConfigs)
                     {
-                        writer.WriteLine($"[timbre_{kvp.Key}]");
-                        writer.WriteLine($"ref_audio={kvp.Value.RefAudioPath}");
-                        writer.WriteLine($"ref_text={kvp.Value.RefText}");
-                        writer.WriteLine($"language={kvp.Value.Language}");
-                        writer.WriteLine($"temperature={kvp.Value.Temperature}");
-                        writer.WriteLine($"sub_temperature={kvp.Value.SubTemperature}");
-                        writer.WriteLine($"instruct={kvp.Value.Instruct}");
+                        writer.WriteLine("[timbre_" + kvp.Key + "]");
+                        writer.WriteLine("ref_audio=" + kvp.Value.RefAudioPath);
+                        writer.WriteLine("ref_text=" + kvp.Value.RefText);
+                        writer.WriteLine("language=" + kvp.Value.Language);
+                        writer.WriteLine("temperature=" + kvp.Value.Temperature);
+                        writer.WriteLine("sub_temperature=" + kvp.Value.SubTemperature);
+                        writer.WriteLine("instruct=" + (kvp.Value.Instruct ?? ""));
                         writer.WriteLine();
                     }
 
@@ -371,17 +453,17 @@ namespace KKAITalk.Audio
                     writer.WriteLine("; ===== 角色喘息配置 =====");
                     foreach (var kvp in _respiteConfigs)
                     {
-                        writer.WriteLine($"[respite_{kvp.Key}]");
-                        writer.WriteLine($"audio_files={string.Join("|", kvp.Value.AudioFiles)}");
+                        writer.WriteLine("[respite_" + kvp.Key + "]");
+                        writer.WriteLine("audio_files=" + string.Join("|", kvp.Value.AudioFiles.ToArray()));
                         writer.WriteLine();
                     }
                 }
 
-                AITalkPlugin.Log.LogInfo($"[Audio] 配置已保存: {ConfigPath}");
+                AITalkPlugin.Log.LogInfo("[Audio] 配置已保存: " + ConfigPath());
             }
             catch (Exception ex)
             {
-                AITalkPlugin.Log.LogError($"[Audio] 保存配置失败: {ex.Message}");
+                AITalkPlugin.Log.LogError("[Audio] 保存配置失败: " + ex.Message);
             }
         }
 

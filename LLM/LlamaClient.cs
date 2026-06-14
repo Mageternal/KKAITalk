@@ -1,81 +1,93 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
 
 namespace KKAITalk.LLM
 {
-    //public enum ThinkingMode
-    //{
-    //    Fast,     // 快速模式：禁用思考，适合简单对话
-    //    Normal    // 思考模式：启用思考，适合复杂场景
-    //}
-
     public class LlamaClient : MonoBehaviour
     {
         private string _url = "http://127.0.0.1:4000/v1/chat/completions";
         private string _model = "Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf";
 
-        // 默认思考模式
-        //public ThinkingMode Mode = ThinkingMode.Normal;
+        // 挂起状态
+        private class PendingRequest
+        {
+            public List<ChatMessage> Messages;
+            public Action<string> OnSuccess;
+            public Action<string> OnError;
+        }
+        private PendingRequest _pending;
+        private bool _wwwBusy = false;
+        private UnityWebRequest _currentWww;
 
         public void SendMessage(List<ChatMessage> messages, Action<string> onSuccess, Action<string> onError)
         {
-            StartCoroutine(SendCoroutine(messages, onSuccess, onError));
-        }
+            if (_wwwBusy)
+            {
+                AITalkPlugin.Log.LogWarning("LLM: 上一个请求尚未完成，跳过");
+                onError?.Invoke("busy");
+                return;
+            }
+            _pending = new PendingRequest { Messages = messages, OnSuccess = onSuccess, OnError = onError };
+            _wwwBusy = true;
 
-        private IEnumerator SendCoroutine(List<ChatMessage> messages, Action<string> onSuccess, Action<string> onError)
-        {
-            AITalkPlugin.Log.LogInfo("SendCoroutine开始被调用");
             string json = BuildJson(messages);
-            byte[] body = new System.Text.UTF8Encoding(false).GetBytes(json);
+            byte[] body = new UTF8Encoding(false).GetBytes(json);
 
-            var www = new UnityWebRequest(_url, "POST");
+            _currentWww = new UnityWebRequest(_url, "POST");
             var uploadHandler = new UploadHandlerRaw(body);
             uploadHandler.contentType = "application/json; charset=utf-8";
-            www.uploadHandler = uploadHandler;
-            www.downloadHandler = new DownloadHandlerBuffer();
+            _currentWww.uploadHandler = uploadHandler;
+            _currentWww.downloadHandler = new DownloadHandlerBuffer();
 
-            AITalkPlugin.Log.LogInfo("SendCoroutine.www装载完成");
+            StartCoroutine(WaitForRequest());
+        }
 
-            yield return www.Send();
+        private IEnumerator WaitForRequest()
+        {
+            yield return _currentWww.Send();
+            _wwwBusy = false;
 
             AITalkPlugin.Log.LogInfo("SendCoroutine.www请求完成");
 
-            if (www.isError)
+            if (_currentWww.isError)
             {
                 AITalkPlugin.Log.LogInfo("SendCoroutine.www，开始返回错误内容");
-                onError?.Invoke(www.error);
-                AITalkPlugin.Log.LogInfo("SendCoroutine.www错误内容返回完成");
+                if (_pending != null)
+                    _pending.OnError(_currentWww.error);
             }
             else
             {
-                AITalkPlugin.Log.LogInfo("SendCoroutine.www没有错误，即将输出原始响应");
-                //AITalkPlugin.Log.LogInfo("原始响应: " + www.downloadHandler.text);
-                AITalkPlugin.Log.LogInfo("原始响应(前200字): " + www.downloadHandler.text.Substring(0, Mathf.Min(200, www.downloadHandler.text.Length)));
-                string content = ExtractContent(www.downloadHandler.text);
-                AITalkPlugin.Log.LogInfo($"ExtractContent结果: {content ?? "null"}");
-                if (content != null) {
+                string text = _currentWww.downloadHandler.text;
+                AITalkPlugin.Log.LogInfo("原始响应(前200字): " + text.Substring(0, Mathf.Min(200, text.Length)));
+                string content = ExtractContent(text);
+                AITalkPlugin.Log.LogInfo("ExtractContent结果: " + (content ?? "null"));
+                if (content != null)
+                {
                     AITalkPlugin.Log.LogInfo("content不为null");
-                    onSuccess?.Invoke(content);
+                    if (_pending != null)
+                        _pending.OnSuccess(content);
                 }
-                else { 
-                    onError?.Invoke("空响应");
+                else
+                {
+                    if (_pending != null)
+                        _pending.OnError("空响应");
                 }
-                AITalkPlugin.Log.LogInfo("出了content判断null");
             }
+
             AITalkPlugin.Log.LogInfo("开始调用www.Dispose()");
-            www.Dispose();
+            _currentWww.Dispose();
+            _currentWww = null;
+            _pending = null;
             AITalkPlugin.Log.LogInfo("SendCoroutine函数结束");
         }
 
         private string BuildJson(List<ChatMessage> messages)
         {
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
             sb.Append("{");
             sb.AppendFormat("\"model\":\"{0}\",", _model);
             sb.Append("\"stream\":false,");
@@ -102,16 +114,14 @@ namespace KKAITalk.LLM
                     .Replace("\n", "\\n")
                     .Replace("\r", "\\r");
         }
+
         private string ExtractContent(string json)
         {
-            // 直接定位 message 的 content 字段
-            // 响应结构是 "message":{"role":"assistant","content":"..."
             string messageKey = "\"message\":{\"role\":\"assistant\",\"content\":\"";
             int start = json.IndexOf(messageKey);
 
             if (start < 0)
             {
-                // 备用方案：找第一个content字段
                 string key = "\"content\":\"";
                 start = json.IndexOf(key);
                 if (start < 0) return null;
@@ -122,7 +132,7 @@ namespace KKAITalk.LLM
                 start += messageKey.Length;
             }
 
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
             for (int i = start; i < json.Length; i++)
             {
                 if (json[i] == '\\' && i + 1 < json.Length)
@@ -140,9 +150,7 @@ namespace KKAITalk.LLM
             string raw = sb.Length > 0 ? sb.ToString() : null;
             if (raw == null) return null;
 
-            // 过滤掉 <think> 和 思考标签
             raw = StripThinkingTags(raw);
-
             return raw;
         }
 
@@ -150,30 +158,18 @@ namespace KKAITalk.LLM
         {
             if (string.IsNullOrEmpty(text)) return text;
 
-            // 处理 \n 形式的换行（JSON中转义后的换行）
             text = text.Replace("\\n", "\n");
-
-            // 移除 <|im_start|> 和 <|im_end|> 等特殊标签
             text = System.Text.RegularExpressions.Regex.Replace(text, @"<\|im_(start|end)\|>", "");
-
-            // 移除 <think>... 或 <thought>...</thought> 等思考标签
             text = System.Text.RegularExpressions.Regex.Replace(text, @"<think>[\s\S]*?", "",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             text = System.Text.RegularExpressions.Regex.Replace(text, @"<thought>[\s\S]*?</thought>", "",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-            // 移除独立出现的 <think> 或 标记
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"", "",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             text = System.Text.RegularExpressions.Regex.Replace(text, @"<think>", "",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-            // 清理多余空行
             text = System.Text.RegularExpressions.Regex.Replace(text, @"\n{3,}", "\n\n");
             text = text.Trim();
 
             return text;
         }
-
     }
 }

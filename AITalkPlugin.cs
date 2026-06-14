@@ -37,26 +37,17 @@ namespace KKAITalk
         private bool _eventTriggered = false;
         private HSceneProc _hSceneProc;
         private object _hFlags;
-        private string _lastAnimState = "";
-        private float _phase3StartTime = 0f; // 阶段3（IN_Loop/OUT_Loop）开始时间
-        private string _prevAnimState = ""; // 上一帧的动画状态（边沿检测）
-        private string _lastLoopType = ""; // 记录进入的是哪种Loop（K/M/A/S）
-        private AudioManager _audioManager; // 音频管理器
-
-        /// <summary>
-        /// 暴露给外部的 AudioManager 访问（因为 AudioManager 挂在独立 GameObject 上，Instance.GetComponent 拿不到）
-        /// </summary>
-        public AudioManager GetAudioManager()
-        {
-            return _audioManager;
-        }
+        //private string _lastAnimState = "";
+        //private float _phase3StartTime = 0f; // 阶段3（IN_Loop/OUT_Loop）开始时间
+        //private string _prevAnimState = ""; // 上一帧的动画状态（边沿检测）
+        //private string _lastLoopType = ""; // 记录进入的是哪种Loop（K/M/A/S）
+        //private AudioManager _audioManager; // 音频管理器
 
 
 
 
         private void Awake()
         {
-            Log = Logger;
             Instance = this;
             var uiObj = new GameObject("AIDialogueUI");
             DontDestroyOnLoad(uiObj);
@@ -78,6 +69,7 @@ namespace KKAITalk
                 "日常对话是否启用思考模式，开启后回复更准确但速度慢"
             );
 
+            Log = Logger;
             Log.LogInfo("KKAITalk 插件已加载！");
             Client = gameObject.AddComponent<LlamaClient>();
 
@@ -119,11 +111,11 @@ namespace KKAITalk
             {
                 _eventTriggered = true; // 确认按钮可用才设置
                 Invoke("ClickPendingEventButton", 3f);
-                AITalkPlugin.Log.LogInfo("按钮" + _pendingEventIndex + "可用，延迟3秒点击");
+                AITalkPlugin.Log.LogInfo($"按钮{_pendingEventIndex}可用，延迟3秒点击");
             }
             else
             {
-                AITalkPlugin.Log.LogWarning("按钮" + _pendingEventIndex + "未激活，事件取消");
+                AITalkPlugin.Log.LogWarning($"按钮{_pendingEventIndex}未激活，事件取消");
                 _pendingTalkScene = null;
             }
         }
@@ -140,11 +132,11 @@ namespace KKAITalk
             if (buttons[_pendingEventIndex] != null && buttons[_pendingEventIndex].gameObject.activeInHierarchy)
             {
                 buttons[_pendingEventIndex].onClick.Invoke();
-                AITalkPlugin.Log.LogInfo("事件触发成功: index=" + _pendingEventIndex);
+                AITalkPlugin.Log.LogInfo($"事件触发成功: index={_pendingEventIndex}");
                 InvokeRepeating("TryClickSkip", 0.3f, 0.2f);
             }
             else
-                AITalkPlugin.Log.LogWarning("按钮" + _pendingEventIndex + "点击时已失效");
+                AITalkPlugin.Log.LogWarning($"按钮{_pendingEventIndex}点击时已失效");
 
             _pendingTalkScene = null;
         }
@@ -172,7 +164,7 @@ namespace KKAITalk
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            AITalkPlugin.Log.LogInfo("场景加载: " + scene.name + ", mode=" + mode);
+            AITalkPlugin.Log.LogInfo($"场景加载: {scene.name}, mode={mode}");
 
             if (scene.name == "Talk")
             {
@@ -183,7 +175,7 @@ namespace KKAITalk
             //吃饭场景
             if (scene.name == "DiningRoom")
             {
-                AITalkPlugin.Log.LogInfo("DiningRoom加载, _talkSceneWasLoaded=" + _talkSceneWasLoaded + ", _eventTriggered=" + _eventTriggered + ", _sceneBeforeTalk=" + _sceneBeforeTalk);
+                AITalkPlugin.Log.LogInfo($"DiningRoom加载, _talkSceneWasLoaded={_talkSceneWasLoaded}, _eventTriggered={_eventTriggered}, _sceneBeforeTalk={_sceneBeforeTalk}");
                 if (_eventTriggered && _sceneBeforeTalk != "DiningRoom")
                 {
                     _talkSceneWasLoaded = false;
@@ -217,7 +209,7 @@ namespace KKAITalk
             //社团活动室
             if (scene.name == "StaffRoom")
             {
-                AITalkPlugin.Log.LogInfo("StaffRoom加载, _eventTriggered=" + _eventTriggered + ", _sceneBeforeTalk=" + _sceneBeforeTalk);
+                AITalkPlugin.Log.LogInfo($"StaffRoom加载, _eventTriggered={_eventTriggered}, _sceneBeforeTalk={_sceneBeforeTalk}");
                 if (_eventTriggered && _sceneBeforeTalk != "StaffRoom")
                 {
                     _eventTriggered = false;
@@ -228,7 +220,7 @@ namespace KKAITalk
             // 回家场景（MyRoom是中间过渡场景，忽略；Courtyard才是实际回家场景）
             if (scene.name == "Courtyard")
             {
-                AITalkPlugin.Log.LogInfo("Courtyard加载, _eventTriggered=" + _eventTriggered + ", _sceneBeforeTalk=" + _sceneBeforeTalk);
+                AITalkPlugin.Log.LogInfo($"Courtyard加载, _eventTriggered={_eventTriggered}, _sceneBeforeTalk={_sceneBeforeTalk}");
                 if (_eventTriggered && _sceneBeforeTalk != "Courtyard")
                 {
                     _eventTriggered = false;
@@ -264,7 +256,7 @@ namespace KKAITalk
         }
         private void OnEventSceneReady()
         {
-            AITalkPlugin.Log.LogInfo("OnEventSceneReady执行, CurrentHeroine=" + (CurrentHeroine != null ? CurrentHeroine.Name : "null"));
+            AITalkPlugin.Log.LogInfo($"OnEventSceneReady执行, CurrentHeroine={CurrentHeroine?.Name ?? "null"}");
             // 尝试隐藏原版对话框
             var msgWindow = FindMsgWindowCanvas();
             if (msgWindow != null)
@@ -297,7 +289,7 @@ namespace KKAITalk
                     {
                         _isFirstEventInput = false;
                         string sysInput = input + GetFirstInputSuffix(_pendingEventScene);
-                        AITalkPlugin.Log.LogInfo("第一次发言附加指令: " + sysInput);
+                        AITalkPlugin.Log.LogInfo($"第一次发言附加指令: {sysInput}");
 
                         AITalkPlugin.OnReplyReceived = () =>
                         {
@@ -320,17 +312,11 @@ namespace KKAITalk
                 if (!string.IsNullOrEmpty(autoInput))
                 {
                     _isFirstEventInput = true;
-                    AITalkPlugin.Log.LogInfo("AI主动发言触发: " + autoInput);
+                    AITalkPlugin.Log.LogInfo($"AI主动发言触发: {autoInput}");
                     controller.OnTalkStart(heroine, autoInput);
                 }
             }
 
-            // 事件场景：同样预热当前角色音色
-            if (_audioManager != null && heroine != null && !string.IsNullOrEmpty(heroine.Name))
-            {
-                _audioManager.SetCurrentCharacter(heroine.Name);
-                _audioManager.PreloadCurrentCharacterVoice();
-            }
 
         }
         private void TryClickSkipSoft()
@@ -497,7 +483,7 @@ namespace KKAITalk
             AITalkPlugin.Log.LogInfo("AI模式自动开启");
 
             var controller = FindObjectOfType<AITalkGameController>();
-            AITalkPlugin.Log.LogInfo("controller是否为null: " + (controller == null));
+            AITalkPlugin.Log.LogInfo($"controller是否为null: {controller == null}");
 
             if (controller != null && talkScene.targetHeroine != null)
             {
@@ -508,16 +494,9 @@ namespace KKAITalk
                     controller.OnTalkStart(heroine, input);
                 };
                 AITalkPlugin.Log.LogInfo("输入事件订阅完成，等待玩家输入");
-
-                // Talk 场景加载完成：锁定 AudioManager 当前角色并预热音色
-                if (_audioManager != null && !string.IsNullOrEmpty(heroine.Name))
-                {
-                    _audioManager.SetCurrentCharacter(heroine.Name);
-                    _audioManager.PreloadCurrentCharacterVoice();
-                }
             }
             else
-                AITalkPlugin.Log.LogWarning("controller=" + (controller == null ? "null" : "not null") + ", heroine=" + (talkScene.targetHeroine == null ? "null" : "not null"));
+                AITalkPlugin.Log.LogWarning($"controller={controller == null}, heroine={talkScene.targetHeroine == null}");
         }
 
         private void StartSkipping()
@@ -568,7 +547,7 @@ namespace KKAITalk
             }
             catch (MissingMethodException ex)
             {
-                AITalkPlugin.Log.LogWarning("SafeGetFieldValue: " + ex.Message);
+                AITalkPlugin.Log.LogWarning($"SafeGetFieldValue: {ex.Message}");
                 return null;
             }
         }
@@ -600,7 +579,7 @@ namespace KKAITalk
             }
             catch (MissingMethodException ex)
             {
-                AITalkPlugin.Log.LogWarning("SafeGetFieldOrPropertyValue(" + name + "): " + ex.Message);
+                AITalkPlugin.Log.LogWarning($"SafeGetFieldOrPropertyValue({name}): {ex.Message}");
                 return null;
             }
         }
@@ -626,7 +605,7 @@ namespace KKAITalk
 
                 if (!string.IsNullOrEmpty(currentMode))
                 {
-                    AITalkPlugin.Log.LogInfo("H场景开始，EMode=" + currentMode);
+                    AITalkPlugin.Log.LogInfo($"H场景开始，EMode={currentMode}");
                     TriggerHSceneIntro(currentMode);
                     _lastEMode = currentMode;
                     _isFirstHLoad = false;
@@ -641,13 +620,6 @@ namespace KKAITalk
                     TriggerHSceneTalk(CurrentHeroine, input);
                 };
                 AITalkPlugin.Log.LogInfo("H场景输入事件订阅完成");
-
-                // H 场景：预热当前角色音色
-                if (_audioManager != null && !string.IsNullOrEmpty(CurrentHeroine.Name))
-                {
-                    _audioManager.SetCurrentCharacter(CurrentHeroine.Name);
-                    _audioManager.PreloadCurrentCharacterVoice();
-                }
             }
 
             // 启动状态监听
@@ -684,7 +656,7 @@ namespace KKAITalk
 
             if (cur == _lastAnimState) return;
 
-            AITalkPlugin.Log.LogInfo("动作状态变化: " + _lastAnimState + " -> " + cur);
+            AITalkPlugin.Log.LogInfo($"动作状态变化: {_lastAnimState} -> {cur}");
 
             // 读取当前EMode
             var emode = SafeGetFieldOrPropertyValue(_hFlags, "mode");
@@ -693,17 +665,18 @@ namespace KKAITalk
             // H场景首次加载或EMode变化时，触发开场白（优先于动作状态检查）
             if (_isFirstHLoad || (!string.IsNullOrEmpty(currentMode) && currentMode != _lastEMode))
             {
-                AITalkPlugin.Log.LogInfo("触发开场白: " + _lastEMode + " -> " + currentMode + "（首次加载:" + _isFirstHLoad + "）");
+                AITalkPlugin.Log.LogInfo($"触发开场白: {_lastEMode} -> {currentMode}（首次加载:{_isFirstHLoad}）");
                 TriggerHSceneIntro(currentMode);
                 _lastEMode = currentMode;
                 _isFirstHLoad = false;
             }
 
             // houshi 模式单独处理
-            //if (currentMode == "houshi")
-            //{
-            //    HandleHoushiMode(cur, prev);
-            //}
+            if (currentMode == "houshi")
+            {
+                HandleHoushiMode(cur, prev);
+            }
+            // aibu/sonyu 模式
             else
             {
                 HandleNormalMode(cur, prev, currentMode);
@@ -738,7 +711,7 @@ namespace KKAITalk
 
         private void HandleHoushiMode(string cur, string prev)
         {
-            AITalkPlugin.Log.LogInfo("houshi模式: " + cur);
+            AITalkPlugin.Log.LogInfo($"houshi模式: {cur}");
 
             // WLoop、SLoop：平缓发言（立即触发）
             if (cur == "WLoop" || cur == "SLoop")
@@ -800,13 +773,14 @@ namespace KKAITalk
                 {
                     TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("K", currentMode));
                 }
+                // 不要立即清空 _lastLoopType，让 M/A_Idle 能检查到
                 return;
             }
 
-            // M_Idle 触发
+            // M_Idle 触发，但要排除从 K_Loop 过来的情况
             if (cur == "M_Idle" && prev != "M_Idle")
             {
-                if (_lastLoopType != "K")
+                if (_lastLoopType != "K") // K_Loop 打断的 M 不触发
                 {
                     AITalkPlugin.Log.LogInfo("进入M_Idle，触发M");
                     if (CurrentHeroine != null)
@@ -814,10 +788,14 @@ namespace KKAITalk
                         TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("M", currentMode));
                     }
                 }
+                else
+                {
+                    AITalkPlugin.Log.LogInfo("进入M_Idle，但被K_Loop打断，跳过");
+                }
                 return;
             }
 
-            // A_Idle 触发
+            // A_Idle 触发，但要排除从 K_Loop 过来的情况
             if (cur == "A_Idle" && prev != "A_Idle")
             {
                 if (_lastLoopType != "K")
@@ -828,6 +806,10 @@ namespace KKAITalk
                         TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("A_start", currentMode));
                     }
                     _pendingHAction = "A";
+                }
+                else
+                {
+                    AITalkPlugin.Log.LogInfo("进入A_Idle，但被K_Loop打断，跳过");
                 }
                 return;
             }
@@ -851,28 +833,102 @@ namespace KKAITalk
                 _lastLoopType = "";
             }
 
-            // sonyu 模式：阶段2-5 的 Loop 处理
+            // ========== sonyu 模式：阶段2-5 的 Loop 处理 ==========
             if (currentMode == "sonyu" && cur.Contains("_Loop"))
             {
                 int currentPhase = Context.GameContextBuilder.GetHAnimPhase(cur);
 
                 if (currentPhase == 3)
                 {
+                    // 阶段3：记录开始时间，延迟10秒
                     if (_phase3StartTime == 0f)
+                    {
                         _phase3StartTime = Time.time;
+                        AITalkPlugin.Log.LogInfo($"进入阶段3: {cur}，开始10秒延迟");
+                    }
+
+                    // 在10秒延迟期间，跳过触发
                     if (Time.time - _phase3StartTime < 10f)
+                    {
+                        AITalkPlugin.Log.LogInfo($"阶段3延迟中，剩余{10f - (Time.time - _phase3StartTime):F1}秒");
                         return;
-                    AITalkPlugin.Log.LogInfo("阶段3延迟结束，触发IN/OUT");
+                    }
+                    else
+                    {
+                        // 10秒延迟结束，继续检测阶段4
+                        AITalkPlugin.Log.LogInfo($"阶段3延迟结束，开始检测阶段4");
+                    }
+                }
+                else if (currentPhase == 2)
+                {
+                    // 阶段2：sonyu 模式的 W/S/O Loop
+                    string prefix = cur.Split('_')[0];
+                    AITalkPlugin.Log.LogInfo($"sonyu阶段2: {prefix}，等待Idle触发");
+                    _pendingHAction = prefix;
                     _phase3StartTime = 0f;
                 }
-                //else if (currentPhase == 4)
-                //{
-                //    if (IsPhase4Complete(cur))
-                //    {
-                //        _phase3StartTime = 0f;
-                //        TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("phase4", currentMode));
-                //    }
-                //}
+            }
+
+            // ========== sonyu 模式：阶段4-5 的 IN_A/OUT_A/Idle 处理 ==========
+            if (currentMode == "sonyu")
+            {
+                // 阶段4：IN_A/OUT_A（高潮结束）
+                if (cur.EndsWith("_IN_A") || cur.EndsWith("_OUT_A") ||
+                    cur == "IN_A" || cur == "OUT_A")
+                {
+                    AITalkPlugin.Log.LogInfo($"sonyu阶段4触发: {cur}");
+                    if (CurrentHeroine != null)
+                    {
+                        TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput(cur, currentMode));
+                    }
+                    _phase3StartTime = 0f;
+                    return;
+                }
+
+                // Idle状态时触发（sonyu 模式）
+                if (cur == "Idle")
+                {
+                    if (!string.IsNullOrEmpty(_pendingHAction))
+                    {
+                        string action = _pendingHAction;
+                        AITalkPlugin.Log.LogInfo($"sonyu Idle触发: {action}");
+                        if (CurrentHeroine != null)
+                        {
+                            TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput(action, currentMode));
+                        }
+                    }
+
+                    // A系列在最后Idle再触发一次
+                    if (_isASeries && CurrentHeroine != null)
+                    {
+                        TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("A_stop", currentMode));
+                    }
+                    // S系列在最后Idle再触发一次
+                    if (_isSSeries && CurrentHeroine != null)
+                    {
+                        TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("S_stop", currentMode));
+                    }
+
+                    // 重置状态
+                    _pendingHAction = "";
+                    _isASeries = false;
+                    _isSSeries = false;
+                    _phase3StartTime = 0f;
+                }
+
+                // Orgasm高潮：Orgasm_A -> 立即触发
+                if (cur == "Orgasm_A")
+                {
+                    AITalkPlugin.Log.LogInfo("Orgasm高潮触发");
+                    if (CurrentHeroine != null)
+                    {
+                        TriggerHSceneTalk(CurrentHeroine, GetHLoopCompletedInput("Orgasm", currentMode));
+                    }
+                    _pendingHAction = "";
+                    _isASeries = false;
+                    _isSSeries = false;
+                    _phase3StartTime = 0f;
+                }
             }
         }
 
@@ -1021,7 +1077,7 @@ namespace KKAITalk
                 var pregData = KK_Pregnancy.PregnancyDataUtils.GetPregnancyData(heroine);
                 chara.PregnancyWeek = (pregData != null) ? pregData.Week : 0;
 
-                AITalkPlugin.Log.LogInfo("怀孕状态: Safe=" + chara.IsSafeDay + ", Risky=" + chara.IsRiskyDay + ", Pregnant=" + chara.IsPregnant + ", Week=" + chara.PregnancyWeek);
+                AITalkPlugin.Log.LogInfo($"怀孕状态: Safe={chara.IsSafeDay}, Risky={chara.IsRiskyDay}, Pregnant={chara.IsPregnant}, Week={chara.PregnancyWeek}");
             }
             catch
             {
@@ -1031,7 +1087,7 @@ namespace KKAITalk
                 chara.PregnancyWeek = 0;
             }
 
-            AITalkPlugin.Log.LogInfo("H场景数据: GaugeFemale=" + chara.GaugeFemale + "%, AnimState=" + chara.NowAnimStateName + ", Animation=" + chara.AnimationName + ", IsAnalPlay=" + chara.IsAnalPlay + ", HMode=" + chara.HMode);
+            AITalkPlugin.Log.LogInfo($"H场景数据: GaugeFemale={chara.GaugeFemale}%, AnimState={chara.NowAnimStateName}, Animation={chara.AnimationName}, IsAnalPlay={chara.IsAnalPlay}, HMode={chara.HMode}");
 
             AIDialogueUI.Instance?.ShowWaiting(chara.Name);
 
@@ -1046,7 +1102,7 @@ namespace KKAITalk
                 messages,
                 reply =>
                 {
-                    AITalkPlugin.Log.LogInfo("[H场景回复] " + reply);
+                    AITalkPlugin.Log.LogInfo($"[H场景回复] {reply}");
 
                     // 清理标签（H场景不需要标签，但以防万一）
                     string cleanReply = System.Text.RegularExpressions.Regex.Replace(
@@ -1054,12 +1110,6 @@ namespace KKAITalk
                     cleanReply = cleanReply.Replace("\n", "").Replace("\r", "");
 
                     AIDialogueUI.Instance?.ShowReply(cleanReply);
-
-                    // TTS 播放 H 场景回复
-                    if (_audioManager != null && !string.IsNullOrEmpty(cleanReply))
-                    {
-                        _audioManager.Speak(cleanReply, null);
-                    }
 
                     // 保存历史记录
                     string cleanInput = System.Text.RegularExpressions.Regex.Replace(
